@@ -1,6 +1,6 @@
 # wqc-docs (The Archive)
 
-[![License: FDL1.3](https://img.shields.io/badge/License-FDL1.3-blue.svg)](https://www.gnu.org/licenses/fdl-1.3.html)
+[![License: GFDL-1.3](https://img.shields.io/badge/License-GFDL--1.3-blue.svg)](https://www.gnu.org/licenses/fdl-1.3.html)
 [![Documentation](https://img.shields.io/badge/Docs-Official-blue.svg)](https://world-qc.io/docs)
 
 This repository serves as the single source of truth for the World Quantum Computer (WQC) protocol. It contains the mathematical foundations, economic models, and philosophical manifestos of the project.
@@ -18,4 +18,4 @@ Quantum computation should be a human right. We document the transition from cen
 We welcome improvements to our mathematical models and translations. Please submit a Pull Request for any proposed changes.
 
 ## License
-All documentation is licensed under the GNU Free Documentation License v1.3 (FDL1.3).
+All documentation is licensed under the GNU Free Documentation License v1.3 (GFDL-1.3).
