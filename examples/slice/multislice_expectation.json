@@ -1,0 +1,21 @@
+{
+  "client_id": "me",
+  "qubit_count": 28,
+  "security_level": "low",
+  "output_mode": "expectation",
+  "circuit": [
+    { "type": "H", "params": [26] },
+    { "type": "CNOT", "params": [26, 27] }
+  ],
+  "observables": [
+    {
+      "id": "ZZ",
+      "terms": [
+        {
+          "label": "ZZIIIIIIIIIIIIIIIIIIIIIIIIII",
+          "coeff": { "real": 1.0, "imag": 0.0 }
+        }
+      ]
+    }
+  ]
+}
