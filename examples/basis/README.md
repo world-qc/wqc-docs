@@ -17,3 +17,5 @@ curl -s -X POST http://localhost:9001/api/v1/submit \
 ```
 
 See WHITEPAPER §3.4.2b and `wqc-core/src/basis.rs`.
+
+Both X/Y sample payloads are in the devnet E2E manifest (`e2e/manifest.tsv`) with golden manifest checks. Consecutive `H,H` / `RX(±π/2)` on the same qubit are **trace-folded** for fixed-point AIR (MPS state unchanged) — see `wqc-core/doc/trace-spec.md`.

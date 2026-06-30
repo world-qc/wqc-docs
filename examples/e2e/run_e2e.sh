@@ -11,12 +11,20 @@ POLL_SECS="${POLL_SECS:-3}"
 LOG_DIR="${LOG_DIR:-/tmp/wqc-e2e-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$LOG_DIR"
 
+# shellcheck source=assert_manifest.sh
+source "$SCRIPT_DIR/assert_manifest.sh"
+
 need() { command -v "$1" >/dev/null 2>&1 || { echo "missing: $1" >&2; exit 1; }; }
 need curl
 need jq
 
 echo "==> orchestrator health: $ORCH_URL"
 curl -sf "$ORCH_URL/health" >/dev/null || { echo "orchestrator not reachable at $ORCH_URL" >&2; exit 1; }
+
+if command -v docker >/dev/null 2>&1; then
+  docker images world-qc/wqc-core:latest --format 'wqc-core: {{.Digest}} ({{.CreatedSince}})' 2>/dev/null \
+    | tee "$LOG_DIR/core_image.txt" || true
+fi
 
 echo "==> client faucet ($CLIENT_ID)"
 curl -sf -X POST "$ORCH_URL/api/v1/economy/client/faucet" \
@@ -40,6 +48,7 @@ run_case() {
   echo "=== CASE: $name ($file) — $notes"
   local submit_log="$LOG_DIR/${name}_submit.json"
   local poll_log="$LOG_DIR/${name}_poll.jsonl"
+  local manifest_log="$LOG_DIR/${name}_manifest.json"
 
   if ! curl -sf -X POST "$ORCH_URL/api/v1/submit" \
     -H 'Content-Type: application/json' \
@@ -74,15 +83,34 @@ run_case() {
     return 1
   fi
 
-  local manifest_url
-  manifest_url="$(jq -r '.manifest_url // empty' "$poll_log" | tail -1)"
-  if [[ -n "$manifest_url" ]]; then
-    local host_url="${manifest_url//wqc-s3-storage:9000/localhost:9000}"
-    if ! curl -sf "$host_url" | jq -c . | tee "$LOG_DIR/${name}_manifest.json" >/dev/null 2>&1; then
-      docker exec wqc-s3-storage mc cat "local/wqc-results/manifests/${task_id}.json" 2>/dev/null \
-        | jq -c . | tee "$LOG_DIR/${name}_manifest.json" >/dev/null || \
-        echo "WARN [$name] manifest fetch failed"
+  local fetched=0
+  for _ in 1 2 3; do
+    local manifest_url
+    manifest_url="$(jq -r '.manifest_url // empty' "$poll_log" | tail -1)"
+    if [[ -n "$manifest_url" ]]; then
+      local host_url="${manifest_url//wqc-s3-storage:9000/localhost:9000}"
+      if curl -sf "$host_url" | jq -c . >"$manifest_log" 2>/dev/null && [[ -s "$manifest_log" ]]; then
+        fetched=1
+        break
+      fi
     fi
+    if docker exec wqc-s3-storage mc cat "local/wqc-results/manifests/${task_id}.json" 2>/dev/null \
+      | jq -c . >"$manifest_log" 2>/dev/null && [[ -s "$manifest_log" ]]; then
+      fetched=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$fetched" != "1" ]]; then
+    echo "FAIL [$name] manifest fetch failed (task_id=$task_id)"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  if ! assert_manifest "$name" "$manifest_log"; then
+    echo "FAIL [$name] manifest assertion (see $manifest_log)"
+    fail=$((fail + 1))
+    return 1
   fi
 
   echo "PASS [$name]"
