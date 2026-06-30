@@ -1,0 +1,9 @@
+# name	file	timeout_sec	tier	notes
+scalar_h2_amplitude	scalar_h2_amplitude.json	90	fast	statevector_scalar Bell prep
+sample_bell_counts	sample_bell_counts.json	90	fast	sample_counts 00/11
+expectation_xz	expectation_xz.json	90	fast	expectation X≈1 Z≈0 on |+⟩
+multislice_4q_counts	multislice_4q_counts.json	120	fast	MP1 multislice counts
+mid_circuit_if_measure	mid_circuit_if_measure.json	120	fast	Phase C IF + mid-circuit MEASURE
+noise_depolarizing_counts	noise_depolarizing_counts.json	120	fast	Phase C noise_model meta
+tn_cut_scalar_28q	tn_cut_scalar_28q.json	180	fast	scalar 28q → 4 slices; tn_cut picks idle wires first
+multislice_28q_zz	multislice_28q_zz.json	300	slow	OP1 multislice expectation ⟨ZZ⟩≈1

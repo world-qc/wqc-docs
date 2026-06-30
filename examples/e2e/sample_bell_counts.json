@@ -1,0 +1,14 @@
+{
+  "client_id": "me",
+  "qubit_count": 2,
+  "classical_bit_count": 2,
+  "security_level": "low",
+  "output_mode": "sample_counts",
+  "shots": 512,
+  "circuit": [
+    { "type": "H", "params": [0] },
+    { "type": "CNOT", "params": [0, 1] },
+    { "type": "MEASURE", "params": { "qubit": 0, "cbit": 0 } },
+    { "type": "MEASURE", "params": { "qubit": 1, "cbit": 1 } }
+  ]
+}

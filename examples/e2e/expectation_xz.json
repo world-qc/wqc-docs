@@ -1,0 +1,19 @@
+{
+  "client_id": "me",
+  "qubit_count": 1,
+  "security_level": "low",
+  "output_mode": "expectation",
+  "circuit": [
+    { "type": "H", "params": [0] }
+  ],
+  "observables": [
+    {
+      "id": "X",
+      "terms": [{ "label": "X", "coeff": { "real": 1.0, "imag": 0.0 } }]
+    },
+    {
+      "id": "Z",
+      "terms": [{ "label": "Z", "coeff": { "real": 1.0, "imag": 0.0 } }]
+    }
+  ]
+}

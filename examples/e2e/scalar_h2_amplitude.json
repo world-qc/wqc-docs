@@ -1,0 +1,10 @@
+{
+  "client_id": "me",
+  "qubit_count": 2,
+  "security_level": "low",
+  "output_mode": "statevector_scalar",
+  "circuit": [
+    { "type": "H", "params": [0] },
+    { "type": "CNOT", "params": [0, 1] }
+  ]
+}
