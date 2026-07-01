@@ -20,6 +20,29 @@ jq_sample_merged() {
   jq -c '[.slices[] | select(.sample_result != null) | .sample_result] | last' "$manifest"
 }
 
+jq_sample_slice() {
+  local manifest="$1"
+  jq -c '[.slices[] | select(.sample_result != null)] | last' "$manifest"
+}
+
+assert_distribution_bound() {
+  local name="$1" manifest="$2" want_bound="$3"
+  local bound
+  bound="$(jq_sample_slice "$manifest" | jq -r '.distribution_bound // false')"
+  if [[ "$want_bound" == "true" && "$bound" != "true" ]]; then
+    echo "ASSERT [$name] distribution_bound=$bound want true" >&2
+    return 1
+  fi
+  if [[ "$want_bound" == "false" && "$bound" == "true" ]]; then
+    echo "ASSERT [$name] distribution_bound=true want false/absent" >&2
+    return 1
+  fi
+  if [[ "$want_bound" == "true" ]]; then
+    jq_sample_slice "$manifest" | jq -e '.distribution_scheme == "born_deterministic_v1"' >/dev/null
+    jq_sample_slice "$manifest" | jq -e '(.measurement_spec_hash | length) > 0' >/dev/null
+  fi
+}
+
 jq_expectation_merged() {
   local manifest="$1"
   jq -c '[.slices[] | select(.expectation_result != null) | .expectation_result] | last' "$manifest"
@@ -55,6 +78,7 @@ assert_manifest() {
       keys="$(echo "$sample" | jq -r '.counts | keys | sort | join(",")')"
       [[ "$keys" == "00,11" ]] || { echo "ASSERT [$name] counts keys=$keys want 00,11" >&2; return 1; }
       echo "$sample" | jq -e '(.counts | add) == .shots' >/dev/null
+      assert_distribution_bound "$name" "$manifest" true
       ;;
 
     expectation_xz)
@@ -75,6 +99,7 @@ assert_manifest() {
       [[ "$shots" == "512" ]] || { echo "ASSERT [$name] shots=$shots want 512" >&2; return 1; }
       keys="$(echo "$sample" | jq -r '.counts | keys | sort | join(",")')"
       [[ "$keys" == "00,11" ]] || { echo "ASSERT [$name] counts keys=$keys want 00,11" >&2; return 1; }
+      assert_distribution_bound "$name" "$manifest" true
       ;;
 
     mid_circuit_if_measure)
@@ -86,6 +111,7 @@ assert_manifest() {
         echo "ASSERT [$name] expected both 00 and 11 in counts: $(echo "$sample" | jq -c '.counts')" >&2
         return 1
       }
+      assert_distribution_bound "$name" "$manifest" false
       ;;
 
     noise_depolarizing_counts)
@@ -95,6 +121,7 @@ assert_manifest() {
       echo "$sample" | jq -e '.shots == 512' >/dev/null
       echo "$sample" | jq -e '(.counts | keys | all(. == "0" or . == "1"))' >/dev/null
       echo "$sample" | jq -e '(.counts | add) == .shots' >/dev/null
+      assert_distribution_bound "$name" "$manifest" false
       ;;
 
     tn_cut_scalar_28q)
@@ -112,6 +139,7 @@ assert_manifest() {
         echo "ASSERT [$name] counts=$(echo "$sample" | jq -c '.counts') want {\"0\":1024}" >&2
         return 1
       }
+      assert_distribution_bound "$name" "$manifest" true
       ;;
 
     y_basis_sample_counts)
@@ -123,6 +151,7 @@ assert_manifest() {
         echo "ASSERT [$name] counts=$(echo "$sample" | jq -c '.counts') want {\"0\":1024}" >&2
         return 1
       }
+      assert_distribution_bound "$name" "$manifest" true
       ;;
 
     multislice_28q_zz)
