@@ -26,7 +26,7 @@ jq_sample_slice() {
 }
 
 assert_distribution_bound() {
-  local name="$1" manifest="$2" want_bound="$3"
+  local name="$1" manifest="$2" want_bound="$3" scheme="${4:-born_air_zk_linked_v1}"
   local bound
   bound="$(jq_sample_slice "$manifest" | jq -r '.distribution_bound // false')"
   if [[ "$want_bound" == "true" && "$bound" != "true" ]]; then
@@ -38,7 +38,7 @@ assert_distribution_bound() {
     return 1
   fi
   if [[ "$want_bound" == "true" ]]; then
-    jq_sample_slice "$manifest" | jq -e '.distribution_scheme == "born_air_zk_linked_v1"' >/dev/null
+    jq_sample_slice "$manifest" | jq -e ".distribution_scheme == \"$scheme\"" >/dev/null
     jq_sample_slice "$manifest" | jq -e '(.measurement_spec_hash | length) > 0' >/dev/null
   fi
 }
@@ -111,7 +111,7 @@ assert_manifest() {
         echo "ASSERT [$name] expected both 00 and 11 in counts: $(echo "$sample" | jq -c '.counts')" >&2
         return 1
       }
-      assert_distribution_bound "$name" "$manifest" false
+      assert_distribution_bound "$name" "$manifest" true trajectory_bound_v1
       ;;
 
     noise_depolarizing_counts)
