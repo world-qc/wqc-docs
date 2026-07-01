@@ -38,7 +38,7 @@ assert_distribution_bound() {
     return 1
   fi
   if [[ "$want_bound" == "true" ]]; then
-    jq_sample_slice "$manifest" | jq -e '.distribution_scheme == "born_deterministic_v1"' >/dev/null
+    jq_sample_slice "$manifest" | jq -e '.distribution_scheme == "born_air_v1"' >/dev/null
     jq_sample_slice "$manifest" | jq -e '(.measurement_spec_hash | length) > 0' >/dev/null
   fi
 }
