@@ -6,16 +6,24 @@
 This repository serves as the single source of truth for the World Quantum Computer (WQC) protocol. It contains the mathematical foundations, economic models, and philosophical manifestos of the project.
 
 ## Document Map
-- `/whitepaper`: Mathematical proofs for distributed tensor contraction and ASIC resistance.
-- `/manifesto`: Our declaration against centralized quantum hegemony.
-- `/spec`: API and networking specifications for the WQC swarm.
-- `/tokenomics`: Details on the fair launch, deflationary burn, and reward halving schedules.
+
+| Path | Status | Contents |
+|------|--------|----------|
+| [`/whitepaper`](whitepaper/) | Present | Versioned English whitepapers (`WHITEPAPER_0.x_en.md` / PDF) and scope notes |
+| [`/examples`](examples/) | Present | Reference circuits, e2e scripts, and topic READMEs (`basis`, `slice`, `phase_c`, `e2e`) |
+| [`/spec`](spec/) | Planned | API and networking specifications for the WQC swarm |
+| `/manifesto` | Planned | Declaration against centralized quantum hegemony |
+| `/tokenomics` | Planned | Fair launch, burn, and reward schedule documentation |
+| `/yellowpaper` | Planned | Formal protocol / cryptography detail (may also live under `/whitepaper` or `/spec` until split) |
+
+Directories marked **Planned** may be empty or absent until the corresponding documents are published.
 
 ## Vision
 Quantum computation should be a human right. We document the transition from centralized "Fortress Computing" to a global "Neural Swarm."
 
 ## Contributing
-We welcome improvements to our mathematical models and translations. Please submit a Pull Request for any proposed changes.
+
+We welcome typo fixes, translation proposals, and new specifications. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute — including review rules for whitepapers and other canonical documents.
 
 ## License
 All documentation is licensed under the GNU Free Documentation License v1.3 (GFDL-1.3).
