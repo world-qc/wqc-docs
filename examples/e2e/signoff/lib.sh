@@ -31,7 +31,7 @@ node_status() {
 }
 
 ensure_client_credit() {
-  local client="${CLIENT_ID:-me}"
+  local client="${CLIENT_ID:-client-01}"
   # Default covers 28q TN / multislice escrow (~4e18+ per task); override via CLIENT_CREDIT_PWQC.
   local amount="${CLIENT_CREDIT_PWQC:-100000000000000000000}"
   docker exec wqc-redis redis-cli SET "economy:client:${client}:balance" "$amount" >/dev/null

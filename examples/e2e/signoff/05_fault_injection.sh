@@ -29,7 +29,7 @@ sleep 2
 # Ultra Bell circuit
 cat >"$OUT/quorum_ultra.json" <<'EOF'
 {
-  "client_id": "me",
+  "client_id": "client-01",
   "qubit_count": 2,
   "classical_bit_count": 2,
   "security_level": "ultra",

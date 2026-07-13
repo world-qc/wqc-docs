@@ -1,5 +1,5 @@
 {
-  "client_id": "me",
+  "client_id": "client-01",
   "qubit_count": 1,
   "classical_bit_count": 1,
   "security_level": "low",

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ORCH_URL="${ORCH_URL:-http://localhost:9001}"
-CLIENT_ID="${CLIENT_ID:-me}"
+CLIENT_ID="${CLIENT_ID:-client-01}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="${SCRIPT_DIR}/manifest.tsv"
 TIER="${TIER:-fast}"

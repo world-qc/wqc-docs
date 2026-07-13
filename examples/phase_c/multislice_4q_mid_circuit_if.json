@@ -7,8 +7,15 @@
   "shots": 512,
   "circuit": [
     { "type": "H", "params": [2] },
-    { "type": "CNOT", "params": [2, 3] },
     { "type": "MEASURE", "params": { "qubit": 2, "cbit": 0 } },
+    {
+      "type": "IF",
+      "params": {
+        "cbit": 0,
+        "value": 1,
+        "gate": { "type": "X", "params": [3] }
+      }
+    },
     { "type": "MEASURE", "params": { "qubit": 3, "cbit": 1 } }
   ]
 }

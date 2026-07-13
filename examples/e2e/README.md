@@ -11,6 +11,7 @@ Curated submit payloads for the local docker devnet. Used by `run_e2e.sh` and do
 | `expectation_xz.json` | `expectation` | ⟨X⟩≈1, ⟨Z⟩≈0 on \|+⟩ |
 | `multislice_4q_counts.json` | `sample_counts` | MP1 — idle q0–q1 fixed, measure q2–q3 |
 | `mid_circuit_if_measure.json` | `sample_counts` | Phase C IF + mid-circuit MEASURE |
+| `multislice_4q_mid_circuit_if.json` | `sample_counts` | C2c MP1 idle wires + mid-circuit IF (trajectory zk) |
 | `noise_depolarizing_counts.json` | `sample_counts` | Phase C `noise_model` meta |
 | `tn_cut_scalar_28q.json` | `statevector_scalar` | 28q → 4 slices; TN cut picks idle wires (`e_2` before `e_0`) |
 | `x_basis_sample_counts` | `sample_counts` | X-basis `H,H` + MEASURE → `{"0":1024}` |

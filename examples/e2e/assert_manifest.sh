@@ -114,6 +114,26 @@ assert_manifest() {
       assert_distribution_bound "$name" "$manifest" true trajectory_air_zk_composed_shot_v1
       ;;
 
+    multislice_4q_mid_circuit_if)
+      # MP1 idle-wire contraction of a mid-circuit IF demo (parent 4q → compact 2q leaf).
+      # Idle-only MP1 dispatches a single leaf (total_partitions==1) after fixing e_0/e_1.
+      jq -e '.result_type == "sample_counts"' "$manifest" >/dev/null
+      jq -e '.total_qubits == 4' "$manifest" >/dev/null || {
+        echo "ASSERT [$name] total_qubits want 4" >&2
+        return 1
+      }
+      jq -e '.total_partitions >= 1' "$manifest" >/dev/null
+      local sample
+      sample="$(jq_sample_merged "$manifest")"
+      echo "$sample" | jq -e '.shots == 512' >/dev/null
+      echo "$sample" | jq -e '(.counts | has("00")) and (.counts | has("11"))' >/dev/null || {
+        echo "ASSERT [$name] expected both 00 and 11 in counts: $(echo "$sample" | jq -c '.counts')" >&2
+        return 1
+      }
+      echo "$sample" | jq -e '(.counts | add) == .shots' >/dev/null
+      assert_distribution_bound "$name" "$manifest" true trajectory_air_zk_composed_shot_v1
+      ;;
+
     noise_depolarizing_counts)
       jq -e '.result_type == "sample_counts"' "$manifest" >/dev/null
       local sample

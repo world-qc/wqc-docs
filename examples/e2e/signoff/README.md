@@ -11,7 +11,7 @@ docker compose up -d
 curl -sf http://localhost:9001/health
 ```
 
-Client credit is applied by `run_e2e.sh` (Redis `economy:client:me:balance`).
+Client credit is applied by `run_e2e.sh` (Redis `economy:client:client-01:balance`).
 
 ## Run order
 
