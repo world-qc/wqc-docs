@@ -26,10 +26,26 @@ if command -v docker >/dev/null 2>&1; then
     | tee "$LOG_DIR/core_image.txt" || true
 fi
 
-echo "==> client faucet ($CLIENT_ID)"
-curl -sf -X POST "$ORCH_URL/api/v1/economy/client/faucet" \
-  -H 'Content-Type: application/json' \
-  -d "{\"client_id\":\"$CLIENT_ID\",\"amount_pwqc\":\"1000000000000000000\"}" | jq -c . || true
+echo "==> client credit via Redis ($CLIENT_ID)"
+REDIS_CONTAINER="${REDIS_CONTAINER:-wqc-redis}"
+AMOUNT_pwqc="${CLIENT_CREDIT_PWQC:-1000000000000000000}"
+if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
+  docker exec "$REDIS_CONTAINER" redis-cli SET "economy:client:${CLIENT_ID}:balance" "$amount_pwqc" >/dev/null
+  bal="$(docker exec "$REDIS_CONTAINER" redis-cli GET "economy:client:${CLIENT_ID}:balance")"
+  echo "{\"client_id\":\"$CLIENT_ID\",\"balance_pwqc\":\"$bal\"}"
+else
+  need redis-cli
+  REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
+  REDIS_PORT="${REDIS_PORT:-6379}"
+  if [[ -n "${REDIS_URL:-}" ]]; then
+    redis-cli -u "$REDIS_URL" SET "economy:client:${CLIENT_ID}:balance" "$amount_pwqc" >/dev/null
+    bal="$(redis-cli -u "$REDIS_URL" GET "economy:client:${CLIENT_ID}:balance")"
+  else
+    redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" SET "economy:client:${CLIENT_ID}:balance" "$amount_pwqc" >/dev/null
+    bal="$(redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" GET "economy:client:${CLIENT_ID}:balance")"
+  fi
+  echo "{\"client_id\":\"$CLIENT_ID\",\"balance_pwqc\":\"$bal\"}"
+fi
 
 pass=0
 fail=0
