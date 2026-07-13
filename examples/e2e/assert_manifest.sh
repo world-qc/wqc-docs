@@ -111,7 +111,7 @@ assert_manifest() {
         echo "ASSERT [$name] expected both 00 and 11 in counts: $(echo "$sample" | jq -c '.counts')" >&2
         return 1
       }
-      assert_distribution_bound "$name" "$manifest" true trajectory_air_zk_composed_v1
+      assert_distribution_bound "$name" "$manifest" true trajectory_air_zk_composed_shot_v1
       ;;
 
     noise_depolarizing_counts)
