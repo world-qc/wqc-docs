@@ -37,7 +37,7 @@ docker exec wqc-redis redis-cli HGETALL "task:${TASK_ID}:meta"
 | rising `pending_tasks` | core slow/down — check `wqc-core` health |
 | submit `400` | client payload / billing `client_id` |
 
-## 4. Client cannot pay / faucet?
+## 4. Client cannot pay / faucet / settlement?
 
 Public: dashboard faucet → Redis balance. Confirm:
 
@@ -46,6 +46,15 @@ docker exec wqc-redis redis-cli GET economy:client:<id>:balance
 ```
 
 Orchestrator HTTP faucet is **removed**. E2E/dev uses Redis `SET` only.
+
+Task completed but no economics receipt, unpaid rewards, or stuck burn:
+
+```bash
+curl -s "$ORCH/api/v1/task/$TASK_ID" | jq '{status,receipt_hash,receipt_url}'
+docker logs wqc-orchestrator 2>&1 | grep -E 'economy\.settlement|burn settled|receipt' | tail -40
+```
+
+Full table (escrow / burn / receipt): [`world-qc-docker/testnet/RUNBOOK.md`](../../../../world-qc-docker/testnet/RUNBOOK.md) § Economy.
 
 ## 5. Proof / consolidation failure?
 
