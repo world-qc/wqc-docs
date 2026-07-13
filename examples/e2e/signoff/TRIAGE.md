@@ -57,4 +57,5 @@ Invalid peer bids are rejected at P2P receive (signature). Root proof failures f
 
 ---
 
-More detail: `AGENT_E2E.md`, `wqc-node/docs/OPERATIONS.md`, `wqc-orchestrator/docs/OBSERVABILITY.md`.
+More detail: `AGENT_E2E.md`, `wqc-node/docs/OPERATIONS.md`, `wqc-orchestrator/docs/OBSERVABILITY.md`,
+and public alert response [`world-qc-docker/testnet/RUNBOOK.md`](../../../../world-qc-docker/testnet/RUNBOOK.md).
