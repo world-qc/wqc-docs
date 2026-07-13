@@ -26,7 +26,7 @@ jq_sample_slice() {
 }
 
 assert_distribution_bound() {
-  local name="$1" manifest="$2" want_bound="$3" scheme="${4:-born_air_zk_linked_v1}"
+  local name="$1" manifest="$2" want_bound="$3" scheme="${4:-born_air_zk_composed_v1}"
   local bound
   bound="$(jq_sample_slice "$manifest" | jq -r '.distribution_bound // false')"
   if [[ "$want_bound" == "true" && "$bound" != "true" ]]; then
