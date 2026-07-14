@@ -62,8 +62,18 @@ docker run --rm wqc-keygen from-private "<PRIVATE_KEY>"
 | --- | --- | --- |
 | `WQC_ORCHESTRATOR_PRIVATE_KEY` | 1 | **Same** value on orchestrator and p2p-proxy |
 | `WQC_NODE_01_PRIVATE_KEY` … `05` | 5 | One `generate` run per node |
-| `WQC_NODE_XX_TESTNET_KEY` (`nk_…`) | 5 | Testnet operator key (separate from Ed25519; dashboard / registration) |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | 1 | Object-store credentials (any strong local values) |
+
+**Operator keys (`WQC_TESTNET_NODE_KEY`):** not in `.env`. The sample [`compose.yml`](compose.yml) uses fixed local identifiers `nk_e2e-node-01` … `05`. These are **not** dashboard-issued keys — any unique non-empty string would work; derivation is HKDF over the raw bytes (`wqc-operator-v1`). The `nk_` prefix is convention only.
+
+After the stack is up, register matching operator **public** keys in Redis (required for bids):
+
+```bash
+chmod +x examples/scripts/redis-reseed-operator-pubkeys.sh
+./examples/scripts/redis-reseed-operator-pubkeys.sh
+```
+
+Re-run after a Redis flush. See [`scripts/redis-reseed-operator-pubkeys.sh`](scripts/redis-reseed-operator-pubkeys.sh).
 
 Do not commit `examples/.env`.
 
@@ -72,6 +82,7 @@ Do not commit `examples/.env`.
 ```bash
 cp examples/.env.example examples/.env   # edit — do not commit .env
 docker compose -f examples/compose.yml up -d
+./examples/scripts/redis-reseed-operator-pubkeys.sh
 curl -sf http://127.0.0.1:9001/health
 export ORCH_URL=http://127.0.0.1:9001
 export COMPOSE_DIR="$PWD/examples"

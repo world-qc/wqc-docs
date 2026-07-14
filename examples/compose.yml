@@ -8,8 +8,9 @@
 #     wqc-docs/examples/compose.yml   <-- you are here
 #
 # Quick start (from wqc-docs repo root):
-#   cp examples/.env.example examples/.env   # fill secrets — wqc-keygen for Ed25519 (see E2E.md)
+#   cp examples/.env.example examples/.env   # Ed25519 secrets only (see E2E.md)
 #   docker compose -f examples/compose.yml up -d
+#   ./examples/scripts/redis-reseed-operator-pubkeys.sh
 #   curl -sf http://127.0.0.1:9001/health
 #   export COMPOSE_DIR=$PWD/examples ORCH_URL=http://127.0.0.1:9001
 #   TIER=fast ./examples/e2e/run_e2e.sh
@@ -292,7 +293,7 @@ services:
       WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
       WQC_DATABASE_URL: sqlite:wqc-node-01.db
       WQC_MAX_MEMORY_GB: "1"
-      WQC_TESTNET_NODE_KEY: ${WQC_NODE_01_TESTNET_KEY:?set WQC_NODE_01_TESTNET_KEY in examples/.env}
+      WQC_TESTNET_NODE_KEY: nk_e2e-node-01
     networks:
       wqc-e2e:
         ipv4_address: 10.0.2.11
@@ -312,7 +313,7 @@ services:
       WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
       WQC_DATABASE_URL: sqlite:wqc-node-02.db
       WQC_MAX_MEMORY_GB: "1"
-      WQC_TESTNET_NODE_KEY: ${WQC_NODE_02_TESTNET_KEY:?set WQC_NODE_02_TESTNET_KEY in examples/.env}
+      WQC_TESTNET_NODE_KEY: nk_e2e-node-02
     networks:
       wqc-e2e:
         ipv4_address: 10.0.2.12
@@ -332,7 +333,7 @@ services:
       WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
       WQC_DATABASE_URL: sqlite:wqc-node-03.db
       WQC_MAX_MEMORY_GB: "1"
-      WQC_TESTNET_NODE_KEY: ${WQC_NODE_03_TESTNET_KEY:?set WQC_NODE_03_TESTNET_KEY in examples/.env}
+      WQC_TESTNET_NODE_KEY: nk_e2e-node-03
     networks:
       wqc-e2e:
         ipv4_address: 10.0.2.13
@@ -352,7 +353,7 @@ services:
       WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
       WQC_DATABASE_URL: sqlite:wqc-node-04.db
       WQC_MAX_MEMORY_GB: "1"
-      WQC_TESTNET_NODE_KEY: ${WQC_NODE_04_TESTNET_KEY:?set WQC_NODE_04_TESTNET_KEY in examples/.env}
+      WQC_TESTNET_NODE_KEY: nk_e2e-node-04
     networks:
       wqc-e2e:
         ipv4_address: 10.0.2.14
@@ -372,7 +373,7 @@ services:
       WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
       WQC_DATABASE_URL: sqlite:wqc-node-05.db
       WQC_MAX_MEMORY_GB: "1"
-      WQC_TESTNET_NODE_KEY: ${WQC_NODE_05_TESTNET_KEY:?set WQC_NODE_05_TESTNET_KEY in examples/.env}
+      WQC_TESTNET_NODE_KEY: nk_e2e-node-05
     networks:
       wqc-e2e:
         ipv4_address: 10.0.2.15
