@@ -13,6 +13,7 @@ This repository serves as the single source of truth for the World Quantum Compu
 | [`/spec`](spec/) | Present | Protocol specifications (see subdirectories) |
 | [`/spec/stark/`](spec/stark/) | Present | STARK proof format, AIR constraints, aggregation, distribution binding |
 | [`/examples`](examples/) | Present | Circuit SSOT (`circuits/`) + E2E harness (`e2e/`) |
+| [`/examples/E2E.md`](examples/E2E.md) | Present | Reference-stack E2E guide (manual + automated + signoff) |
 | `/tokenomics` | Planned | Fair launch, burn, and reward schedule documentation |
 
 Directories marked **Planned** may be empty or absent until the corresponding documents are published.

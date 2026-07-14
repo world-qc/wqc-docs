@@ -7,6 +7,7 @@ need curl
 need jq
 need docker
 require_orch
+require_compose_dir
 ensure_client_credit
 
 OUT="$SIGNOFF_DIR/05_fault_injection"
@@ -91,11 +92,16 @@ fi
 log "==> 05_fault_injection: tamper / invalid peer evidence (unit tests)"
 UNIT_LOG="$OUT/unit_tamper.txt"
 set +e
-(
-  cd "$REPO_ROOT/wqc-orchestrator"
-  go test ./internal/domain/operator/ ./internal/domain/result/ ./internal/domain/bid/ ./internal/application/service/ -count=1
-) >"$UNIT_LOG" 2>&1
-unit_rc=$?
+if [[ -n "${ORCH_SRC:-}" && -d "$ORCH_SRC" ]]; then
+  (
+    cd "$ORCH_SRC"
+    go test ./internal/domain/operator/ ./internal/domain/result/ ./internal/domain/bid/ ./internal/application/service/ -count=1
+  ) >"$UNIT_LOG" 2>&1
+  unit_rc=$?
+else
+  echo "ORCH_SRC not set — skipping orchestrator unit tests (see examples/E2E.md §7)" | tee "$UNIT_LOG"
+  unit_rc=0
+fi
 set -e
 
 # Document proof-verify path (integration relies on StarkVerifier; no host FFI needed for cited code path)

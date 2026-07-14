@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Devnet E2E runner — see /Users/yoshitaka/world-qc/AGENT_E2E.md
+# E2E runner — see ../E2E.md
 set -euo pipefail
 
 ORCH_URL="${ORCH_URL:-http://localhost:9001}"

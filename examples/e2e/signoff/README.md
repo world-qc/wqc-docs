@@ -1,17 +1,20 @@
-# §6 E2E signoff harness (devnet)
+# E2E signoff harness
 
-Reproducible normal-path E2E + recovery/fault drills for `PUBLIC_TESTNET_TASKS` §6.
-Target stack: [`world-qc-docker/devnet/compose.yml`](../../../../world-qc-docker/devnet/compose.yml).
+Reproducible normal-path E2E plus recovery and fault drills. Target stack is defined in [`../../E2E.md`](../../E2E.md) §2 (reference E2E stack).
 
 ## Prerequisites
 
+1. A running stack that satisfies [`E2E.md` §2](../../E2E.md#2-reference-e2e-stack).
+2. For drills 03–06: set **`COMPOSE_DIR`** to the directory containing your stack’s `compose.yml`.
+3. Orchestrator reachable at `ORCH_URL` (default `http://127.0.0.1:9001`).
+
 ```bash
-cd world-qc-docker/devnet
-docker compose up -d
-curl -sf http://localhost:9001/health
+export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
+export COMPOSE_DIR=/path/to/your/stack
+curl -sf "$ORCH_URL/health"
 ```
 
-Client credit is applied by `run_e2e.sh` (Redis `economy:client:client-01:balance`).
+Client credit is applied by `run_e2e.sh` (Redis key `economy:client:client-01:balance`).
 
 ## Run order
 
@@ -24,9 +27,8 @@ Client credit is applied by `run_e2e.sh` (Redis `economy:client:client-01:balanc
 | 5 | `05_fault_injection.sh` | Quorum stall/recovery + tamper/proof unit evidence |
 | 6 | `06_memory_budget.sh` | Multi-node `/status` memory / qubit caps |
 
-Orchestrator:
-
 ```bash
+cd examples/e2e/signoff   # from wqc-docs repo root
 ./run_signoff.sh                 # full §6
 SKIP_SLOW=1 ./run_signoff.sh     # fast + drills only (not enough to close §6)
 ```
@@ -48,5 +50,4 @@ Commit only [`RESULT.md`](RESULT.md) (filled from [`RESULT.template.md`](RESULT.
 
 ## Completion
 
-See checklist in `RESULT.md` and `PUBLIC_TESTNET_TASKS.md` §6.
-Triage after public launch: [`TRIAGE.md`](TRIAGE.md).
+See checklist in `RESULT.md`. Operator triage: [`TRIAGE.md`](TRIAGE.md).

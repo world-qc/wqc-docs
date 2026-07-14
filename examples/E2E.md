@@ -1,0 +1,283 @@
+# WQC end-to-end testing
+
+Human-facing guide for manual submits, the curated regression harness, and signoff drills.
+Submit payloads live in [`circuits/`](circuits/); runners in [`e2e/`](e2e/).
+
+This document defines a **reference E2E stack** (logical services and URLs). It does not depend on any private compose checkout. Bring up a stack that satisfies §2, then run the scripts from this repository.
+
+## 1. Purpose and scope
+
+| Suite | Cases | Runtime (typical) | What it proves |
+| --- | --- | --- | --- |
+| `TIER=fast` | 10 | ~30–60 s | Scalar, counts, expectation, multislice, Phase C mid-circuit / noise, TN cut, X/Y basis |
+| `TIER=all` | 11 | + slow OP1 | Adds `multislice_28q_zz` (28q ZZ expectation, minutes) |
+| Signoff drills | E2E + 5 recovery/fault scripts | varies | §6-style rehearsal: restart, quorum stall, memory budget |
+
+Public testnet differs only in DNS, TLS, and faucet UI — the orchestrator API and manifest shape are the same.
+
+## 2. Reference E2E stack
+
+Minimum logical layout for the harness in this repo:
+
+| Component | Required capability | Default / example |
+| --- | --- | --- |
+| **Orchestrator HTTP** | `GET /health`, `POST /api/v1/submit`, `GET /api/v1/task/{id}`, `GET /api/v1/p2p/bootstrap` | `ORCH_URL=http://127.0.0.1:9001` |
+| **Economy store** | Redis (or equivalent) key `economy:client:{client_id}:balance` | `REDIS_HOST=127.0.0.1`, `REDIS_PORT=6379` or `REDIS_URL` |
+| **Object store** | S3-compatible bucket for manifests and proofs; presigned GET URLs on completed tasks | Host rewrite: internal hostname → reachable host (see §4) |
+| **Worker swarm** | ≥ **5** nodes online for full signoff; ≥ **3** for `security_level=ultra` quorum drills | P2P bootstrap from orchestrator |
+| **Core workers** | One compute container/process per bid-capable node | Image tag recorded in E2E logs |
+
+### Billing and quorum
+
+| Setting | Reference value |
+| --- | --- |
+| Client billing | **enabled** — every submit needs `"client_id"` |
+| Example client | `client-01` (override with `CLIENT_ID`) |
+| Client credit (E2E) | Set balance before batch runs (see §4) — default `1e20` pWQC via `CLIENT_CREDIT_PWQC` |
+| P2P bootstrap (in-cluster) | `http://<orchestrator-host>:9000/api/v1/p2p/bootstrap` |
+
+### Health check
+
+```bash
+curl -sf "$ORCH_URL/health"
+curl -sf "$ORCH_URL/api/v1/p2p/bootstrap" | jq '{peer_id, multiaddrs}'
+```
+
+### Docker naming overrides (optional)
+
+Scripts assume conventional container names when `docker` is available. Override if your stack uses different names:
+
+| Variable | Default | Used by |
+| --- | --- | --- |
+| `REDIS_CONTAINER` | `wqc-redis` | `run_e2e.sh`, signoff credit |
+| `NODE_CONTAINER` | `wqc-node-01` | `03_node_restart.sh` |
+| `ORCH_CONTAINER` | `wqc-orchestrator-01` | `04_orch_restart.sh`, failure logs |
+| Object store admin | `wqc-s3-storage` | manifest fallback via `mc cat` |
+
+Signoff drills that **stop/start** services additionally require:
+
+| Variable | Meaning |
+| --- | --- |
+| `COMPOSE_DIR` | Directory containing **`compose.yml`** for your reference stack (no default — you must set this) |
+
+## 3. Prerequisites
+
+Tools:
+
+- `curl`, `jq`
+- `redis-cli` **or** Docker access to the economy Redis container
+- For signoff drills 03–06: `docker`, `COMPOSE_DIR` pointing at your stack
+
+From a clone of **this repository** (`wqc-docs`):
+
+```bash
+chmod +x examples/e2e/run_e2e.sh examples/e2e/assert_manifest.sh
+chmod +x examples/e2e/signoff/*.sh
+```
+
+## 4. Manual flow
+
+### Submit
+
+```http
+POST /api/v1/submit
+Content-Type: application/json
+```
+
+| Field | Notes |
+| --- | --- |
+| `client_id` | Required when billing is on |
+| `qubit_count` | Global register width |
+| `security_level` | `"low"` \| `"normal"` \| `"high"` \| `"ultra"` → `required_votes` |
+| `circuit` | Gate list (`type` + `params`) |
+| `output_mode` | Omit → `statevector_scalar`. Also `sample_counts`, `expectation` |
+| `shots` | Required for `sample_counts` |
+| `classical_bit_count` | Required when circuit has `MEASURE` |
+| `observables` | Required for `expectation` |
+
+`sample_seed` is **orchestrator-generated** (not client-supplied).
+
+Example (from repo root):
+
+```bash
+export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
+curl -s -X POST "$ORCH_URL/api/v1/submit" \
+  -H 'Content-Type: application/json' \
+  -d @examples/circuits/sample/sample_bell_counts.json | jq .
+```
+
+### Client credit
+
+Before batch E2E, fund the client balance:
+
+```bash
+# Via redis-cli (adjust host/port or use REDIS_URL)
+redis-cli SET economy:client:client-01:balance 100000000000000000000
+redis-cli GET economy:client:client-01:balance
+
+# Or via Docker when REDIS_CONTAINER is running
+docker exec wqc-redis redis-cli SET economy:client:client-01:balance 100000000000000000000
+```
+
+The automated runner applies the same key before cases (see §6).
+
+### Poll task status
+
+```bash
+TASK_ID=019f…
+curl -s "$ORCH_URL/api/v1/task/$TASK_ID" | jq .
+```
+
+| `status` | Meaning |
+| --- | --- |
+| `pending` | Bidding / not yet dispatched |
+| `dispatched` | Slices in flight |
+| `completed` | Manifest + `proof_root_hash` available |
+| `failed` | See `error` field |
+
+### Manifest inspection
+
+Presigned URLs may use an **internal hostname** (e.g. `wqc-s3-storage:9000`). Rewrite to a host-reachable endpoint:
+
+```bash
+URL=$(curl -s "$ORCH_URL/api/v1/task/$TASK_ID" | jq -r .manifest_url)
+HOST_URL="${URL//wqc-s3-storage:9000/127.0.0.1:9000}"
+curl -s "$HOST_URL" | jq .
+```
+
+If object-store admin tools are available in your stack:
+
+```bash
+docker exec wqc-s3-storage mc cat "local/wqc-results/manifests/${TASK_ID}.json" | jq .
+```
+
+Expect `result_type`, `sample_result` / `expectation_result`, `slices`, `root_hash`, and for counts tasks dominant bitstrings (e.g. Bell → `"00"` and `"11"`).
+
+Phase C meta (optional): `measurement_spec_hash`, `noise_model` in orchestrator task meta for applicable submits.
+
+## 5. Curated circuits and manifest
+
+| Path | Role |
+| --- | --- |
+| [`circuits/`](circuits/) | **SSOT** — all submit JSON |
+| [`e2e/manifest.tsv`](e2e/manifest.tsv) | Case registry (`name`, path, timeout, tier) |
+| [`e2e/assert_manifest.sh`](e2e/assert_manifest.sh) | Per-case golden checks after `completed` |
+
+| Tier | Cases |
+| --- | --- |
+| `fast` (10) | scalar, bell counts, expectation, multislice 4q, mid-circuit IF, multislice mid-circuit IF, noise, tn_cut 28q, x_basis, y_basis |
+| `slow` | `multislice_28q_zz` (OP1, ~minutes) |
+
+See [`circuits/README.md`](circuits/README.md) for file layout and shot conventions (`512` for regression counts, `1024` for deterministic X/Y basis).
+
+## 6. Automated runner
+
+From **`wqc-docs` repository root**:
+
+```bash
+export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
+
+# Fast tier (10 cases + manifest golden checks)
+TIER=fast ./examples/e2e/run_e2e.sh
+
+# Full suite including slow 28q expectation (11 cases)
+TIER=all ./examples/e2e/run_e2e.sh
+```
+
+Environment overrides:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ORCH_URL` | `http://localhost:9001` | Orchestrator base URL |
+| `CLIENT_ID` | `client-01` | Billing client |
+| `TIER` | `fast` | `fast`, `all`, or a single tier name from manifest |
+| `POLL_SECS` | `3` | Poll interval |
+| `LOG_DIR` | `/tmp/wqc-e2e-<timestamp>` | Per-case artifacts |
+| `CLIENT_CREDIT_PWQC` | `100000000000000000000` | Pre-run balance SET |
+| `REDIS_CONTAINER` | `wqc-redis` | Docker Redis for credit |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_URL` | `127.0.0.1:6379` | Direct redis-cli path |
+
+Logs per case: `$LOG_DIR/<case>_submit.json`, `_poll.jsonl`, `_manifest.json`, `_orch.log` (on failure), plus `$LOG_DIR/core_image.txt` when Docker is available.
+
+Exit code **0** = all selected cases reached `completed` **and** passed manifest assertions.
+
+## 7. Signoff drills
+
+Harness: [`e2e/signoff/`](e2e/signoff/) — reproducible E2E plus recovery and fault exercises.
+
+**Prerequisites:** §2 reference stack running; `COMPOSE_DIR` set for drills that restart or stop containers.
+
+```bash
+export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
+export COMPOSE_DIR=/path/to/your/stack   # directory with compose.yml
+
+cd examples/e2e/signoff
+./run_signoff.sh                 # fast + all + drills
+SKIP_SLOW=1 ./run_signoff.sh     # fast + drills only (does not close full §6 checklist)
+```
+
+| Step | Script | What it proves |
+| --- | --- | --- |
+| 1 | `01_e2e_fast.sh` | Fast tier (10 cases) + manifest asserts |
+| 2 | `02_e2e_all.sh` | Full suite incl. slow `multislice_28q_zz` |
+| 3 | `03_node_restart.sh` | Node pending / outbox survive restart |
+| 4 | `04_orch_restart.sh` | Orchestrator restart → health + bootstrap + task progress |
+| 5 | `05_fault_injection.sh` | Quorum stall/recovery; optional orchestrator unit tests |
+| 6 | `06_memory_budget.sh` | Multi-node `/status` memory / qubit caps |
+
+Drill-specific variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `COMPOSE_DIR` | **Required** for 03–06 when using `docker compose` stop/start |
+| `ORCH_SRC` | Optional path to `wqc-orchestrator` checkout for `go test` in drill 05 |
+| `SIGNOFF_DIR` | Artifact root (default `/tmp/wqc-signoff-<timestamp>`) |
+
+Record results in [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) (from [`RESULT.template.md`](e2e/signoff/RESULT.template.md)). Operator triage after public launch: [`e2e/signoff/TRIAGE.md`](e2e/signoff/TRIAGE.md).
+
+### Expected log markers
+
+| Area | Marker |
+| --- | --- |
+| E2E pass | `PASS [case]` / runner exit 0 |
+| Quorum lock | orchestrator: `quorum locked, starting scheduler` |
+| Quorum agree | `quorum agreement reached` |
+| Task close | `task consolidated and closed` |
+| Node work | `Worker: Finished task` / `[P2P Result] Delivered` |
+| Quorum stall | `failed to form quorum` or task stuck `pending` with few nodes |
+| TN cut (`tn_cut_scalar_28q`) | slicing log shows `edge_id=e_2` first (idle wire), not `e_0` |
+
+## 8. Failure diagnosis
+
+| Symptom | First check |
+| --- | --- |
+| submit `400` | `client_id`, `classical_bit_count`, `output_mode` in payload |
+| `status=failed` / `Compute failure` | worker logs; core image stale? |
+| `air_sum != 0` | rebuild all core workers; trace fold for `H,H` / `RX(±π/2)` |
+| TN cut picks `edge_id=e_0` first | orchestrator still on old binary — restart or fix compile |
+| manifest URL 404 from host | rewrite internal object-store hostname or use admin `mc cat` |
+| `ASSERT [...] manifest` failed | task completed but wrong physics — see `assert_manifest.sh` |
+| stuck `pending` | orchestrator logs; economy balance; quorum / node count |
+| node restart mid-task | worker `/status` → `pending_tasks` / `outbox_pending`; drill `03_node_restart.sh` |
+| orch restart mid-task | health + `/api/v1/p2p/bootstrap`; drill `04_orch_restart.sh` |
+| quorum stall (`ultra`) | too few nodes online — drill `05_fault_injection.sh` |
+| proof / bid tamper | orchestrator rejects bad signatures; root verify fails task |
+
+### Known pitfalls
+
+1. **Missing `client_id`** → submit 400 when billing enabled.
+2. **Presigned manifest URL** uses in-cluster DNS — rewrite hostname or fetch via object-store admin.
+3. **Orchestrator hot-reload** may leave an old binary after compile errors — verify TN cut log or restart orchestrator.
+4. **28q scalar** produces **4 slices** — allow ~180 s timeout in manifest.
+
+## 9. Last verified
+
+Update this section when re-running against your reference stack.
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-07-14 |
+| `TIER=fast` | 10/10 `completed` + manifest assertions |
+| `TIER=all` | 11/11 incl. slow `multislice_28q_zz` |
+| Logs | `/tmp/wqc-e2e-20260714-140909` (fast), `/tmp/wqc-e2e-all-20260714-141026` (all) |
+| Core image | `sha256:e969910473a7dab3b2400d7e6b4e1db1d46d310e2c46755c2d7937c2d8d52bb0` |

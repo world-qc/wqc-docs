@@ -6,9 +6,7 @@ SIGNOFF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 E2E_ROOT="$(cd "$SIGNOFF_ROOT/.." && pwd)"
 EXAMPLES_ROOT="$(cd "$E2E_ROOT/.." && pwd)"
 CIRCUITS_ROOT="$EXAMPLES_ROOT/circuits"
-REPO_ROOT="$(cd "$SIGNOFF_ROOT/../../../.." && pwd)"
 ORCH_URL="${ORCH_URL:-http://localhost:9001}"
-COMPOSE_DIR="${COMPOSE_DIR:-$REPO_ROOT/world-qc-docker/devnet}"
 SIGNOFF_DIR="${SIGNOFF_DIR:-/tmp/wqc-signoff-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$SIGNOFF_DIR"
 
@@ -18,7 +16,13 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing: $1"; }
 
 require_orch() {
-  curl -sf "$ORCH_URL/health" >/dev/null || die "orchestrator not reachable at $ORCH_URL — cd world-qc-docker/devnet && docker compose up -d"
+  curl -sf "$ORCH_URL/health" >/dev/null \
+    || die "orchestrator not reachable at $ORCH_URL — see examples/E2E.md §2"
+}
+
+require_compose_dir() {
+  [[ -n "${COMPOSE_DIR:-}" && -f "${COMPOSE_DIR}/compose.yml" ]] \
+    || die "COMPOSE_DIR must point to a directory containing compose.yml — see examples/E2E.md §7"
 }
 
 # Node images may lack curl; share the node's network namespace from a curl sidecar.
@@ -34,9 +38,20 @@ node_status() {
 
 ensure_client_credit() {
   local client="${CLIENT_ID:-client-01}"
-  # Default covers 28q TN / multislice escrow (~4e18+ per task); override via CLIENT_CREDIT_PWQC.
   local amount="${CLIENT_CREDIT_PWQC:-100000000000000000000}"
-  docker exec wqc-redis redis-cli SET "economy:client:${client}:balance" "$amount" >/dev/null
+  local redis_container="${REDIS_CONTAINER:-wqc-redis}"
+  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "$redis_container"; then
+    docker exec "$redis_container" redis-cli SET "economy:client:${client}:balance" "$amount" >/dev/null
+    return
+  fi
+  need redis-cli
+  if [[ -n "${REDIS_URL:-}" ]]; then
+    redis-cli -u "$REDIS_URL" SET "economy:client:${client}:balance" "$amount" >/dev/null
+  else
+    local host="${REDIS_HOST:-127.0.0.1}"
+    local port="${REDIS_PORT:-6379}"
+    redis-cli -h "$host" -p "$port" SET "economy:client:${client}:balance" "$amount" >/dev/null
+  fi
 }
 
 submit_json() {

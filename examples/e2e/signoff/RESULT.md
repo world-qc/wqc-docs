@@ -6,7 +6,7 @@ Filled after `./run_signoff.sh` drills + re-run of `01`/`02` with corrected clie
 | --- | --- |
 | Date | 2026-07-13 (JST) |
 | Host / operator | local Colima / Auto |
-| Compose | `world-qc-docker/devnet/compose.yml` |
+| Reference stack | `examples/E2E.md` §2 (internal devnet checkout) |
 | Orchestrator URL | `http://localhost:9001` |
 | Core image digest | `sha256:e969910473a7dab3b2400d7e6b4e1db1d46d310e2c46755c2d7937c2d8d52bb0` |
 | Signoff log dir (drills) | `/tmp/wqc-signoff-20260713-150932` |

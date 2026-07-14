@@ -1,6 +1,8 @@
-# Devnet E2E harness
+# E2E harness
 
-Curated **runners** for the local docker devnet. Submit payloads live under [`../circuits/`](../circuits/) and are listed in `manifest.tsv`. See [`AGENT_E2E.md`](../../../AGENT_E2E.md).
+Curated **runners** for regression against a reference WQC stack. Submit payloads live under [`../circuits/`](../circuits/) and are listed in `manifest.tsv`.
+
+**Setup, API, and troubleshooting:** [`../E2E.md`](../E2E.md).
 
 ## Layout
 
@@ -9,7 +11,7 @@ Curated **runners** for the local docker devnet. Submit payloads live under [`..
 | `manifest.tsv` | Case registry (`name`, path under `circuits/`, timeout, tier) |
 | `run_e2e.sh` | Submit → poll → download task → golden assert |
 | `assert_manifest.sh` | Per-case slice golden checks |
-| `signoff/` | Public-testnet style signoff drills |
+| `signoff/` | E2E + recovery / fault drills |
 
 ## Cases (see `manifest.tsv`)
 
@@ -29,14 +31,14 @@ Curated **runners** for the local docker devnet. Submit payloads live under [`..
 
 Fast tier: **10** cases. `TIER=all` adds the slow OP1 case.
 
-## Golden manifest checks
-
-After each task reaches `completed`, `assert_manifest.sh` validates slice outputs (not just HTTP status).
-
 ## Quick run
 
+From the **`wqc-docs` repository root**:
+
 ```bash
-TIER=fast wqc-docs/examples/e2e/run_e2e.sh
-TIER=all wqc-docs/examples/e2e/run_e2e.sh
-scripts/devnet-smoke.sh
+export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
+TIER=fast ./examples/e2e/run_e2e.sh
+TIER=all ./examples/e2e/run_e2e.sh
 ```
+
+Golden **manifest assertions** (`assert_manifest.sh`) run after each `completed` task — not just HTTP status.
