@@ -1,0 +1,380 @@
+# Reference E2E stack for wqc-docs/examples (minimal subset of a full devnet layout).
+#
+# Layout: this file lives under wqc-docs/examples/. Build contexts assume the
+# wqc-docs repo is checked out inside the World QC monorepo:
+#
+#   <monorepo>/
+#     wqc-core/ wqc-node/ wqc-orchestrator/ wqc-p2p-proxy/ wqc-stark-engine/
+#     wqc-docs/examples/compose.yml   <-- you are here
+#
+# Quick start (from wqc-docs repo root):
+#   cp examples/.env.example examples/.env   # fill secrets — wqc-keygen for Ed25519 (see E2E.md)
+#   docker compose -f examples/compose.yml up -d
+#   curl -sf http://127.0.0.1:9001/health
+#   export COMPOSE_DIR=$PWD/examples ORCH_URL=http://127.0.0.1:9001
+#   TIER=fast ./examples/e2e/run_e2e.sh
+#
+# See examples/E2E.md for the full guide.
+
+volumes:
+  wqc-sockert:
+  wqc-orchestrator-gomod:
+  wqc-orchestrator-gocache:
+  wqc-redis-data:
+  wqc-minio-data:
+
+networks:
+  wqc-e2e:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.0.0/16
+
+x-core-base: &core-base
+  image: world-qc/wqc-core:latest
+  build:
+    context: ../..
+    dockerfile: wqc-core/Dockerfile
+    args:
+      WQC_FEATURES: webgpu
+  mem_limit: 3G
+  deploy:
+    resources:
+      limits:
+        memory: 3G
+  tty: true
+  stdin_open: true
+  volumes:
+    - ../../wqc-core:/app
+    - /app/target/
+    - wqc-sockert:/var/run
+
+x-node-dev-cmd: &node-dev-cmd
+  sh -c "cp /Cargo.lock /app/Cargo.lock 2>/dev/null || true && cargo build --release -q && ./target/release/wqc-node"
+
+x-node-base: &node-base
+  image: world-qc/wqc-node:latest
+  build:
+    context: ../../wqc-node
+    dockerfile: Dockerfile
+    target: builder
+  command: *node-dev-cmd
+  tty: true
+  stdin_open: true
+  volumes:
+    - ../../wqc-node:/app
+    - /app/target/
+    - wqc-sockert:/var/run
+
+services:
+  wqc-redis:
+    container_name: wqc-redis
+    image: redis:latest
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.3.20
+    ports:
+      - "6379:6379"
+    volumes:
+      - wqc-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  wqc-s3-storage:
+    container_name: wqc-s3-storage
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in examples/.env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in examples/.env}
+    restart: unless-stopped
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.3.30
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        mkdir -p /data/wqc-results
+        /usr/bin/minio server /data --console-address ":9090" &
+        pid=$$!
+        until curl -sf http://localhost:9000/minio/health/live; do sleep 1; done
+        mc alias set local http://localhost:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        wait $$pid
+    volumes:
+      - wqc-minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  wqc-orchestrator-01:
+    container_name: wqc-orchestrator-01
+    build:
+      context: ../../wqc-orchestrator
+      dockerfile: Dockerfile
+    image: world-qc/wqc-orchestrator:latest
+    environment:
+      WQC_LOG_FORMAT: json
+      WQC_LOG_LEVEL: info
+      WQC_ORCHESTRATOR_PRIVATE_KEY: ${WQC_ORCHESTRATOR_PRIVATE_KEY:?set WQC_ORCHESTRATOR_PRIVATE_KEY in examples/.env}
+      WQC_P2P_PROXY_SOCKET: /var/run/wqc-p2p-01.sock
+      WQC_P2P_ADVERTISE_ADDRS: /ip4/10.0.3.12/tcp/4001,/ip4/10.0.3.12/udp/4001/quic-v1
+      WQC_COMPUTE_TIMEOUT_SECS: "300"
+      WQC_ORCHESTRATOR_SLACK_SECS: "30"
+      WQC_BID_DIFFICULTY_LOW: "0"
+      WQC_BID_DIFFICULTY_NORMAL: "1"
+      WQC_BID_DIFFICULTY_HIGH: "2"
+      WQC_BID_DIFFICULTY_ULTRA: "3"
+      WQC_BID_COLLECTION_LOW_MS: "500"
+      WQC_BID_COLLECTION_NORMAL_MS: "800"
+      WQC_BID_COLLECTION_HIGH_MS: "1500"
+      WQC_BID_COLLECTION_ULTRA_MS: "2500"
+      WQC_BID_COLLECTION_PER_DIFFICULTY_MS: "400"
+      WQC_BID_COLLECTION_MAX_MS: "5000"
+      WQC_BID_SESSION_BACKUP_FACTOR: "10"
+      WQC_BID_SESSION_MARGIN: "10"
+      WQC_BID_SESSION_MIN: "10"
+      WQC_BID_SESSION_MAX: "100"
+      WQC_REDIS_ADDR: redis://wqc-redis:6379
+      WQC_S3_ENDPOINT: http://wqc-s3-storage:9000
+      WQC_S3_BUCKET: wqc-results
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in examples/.env}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in examples/.env}
+      AWS_REGION: auto
+      WQC_CLIENT_BILLING: "1"
+      WQC_MAX_DEV_STAKE_WQC: "100"
+      WQC_STRAGGLER_REWARD_WQC: "0.05"
+      WQC_STRAGGLER_GRACE_SECS: "30"
+      WQC_BASE_FEE: "0.001"
+      WQC_BASE_FEE_MAX: "0.01"
+      WQC_BASE_FEE_TARGET_QUEUE: "10"
+      WQC_BASE_FEE_ADJUST_BPS: "500"
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.3.11
+    ports:
+      - "9001:9000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../../wqc-orchestrator:/app
+      - ../../wqc-stark-engine/dist:/usr/local/lib
+      - wqc-orchestrator-gomod:/go/pkg/mod
+      - wqc-orchestrator-gocache:/root/.cache/go-build
+      - wqc-sockert:/var/run
+    depends_on:
+      wqc-redis:
+        condition: service_healthy
+      wqc-s3-storage:
+        condition: service_healthy
+
+  wqc-p2p-proxy-01:
+    container_name: wqc-p2p-proxy-01
+    build:
+      context: ../../wqc-p2p-proxy
+      dockerfile: Dockerfile
+      target: builder
+    image: world-qc/wqc-p2p-proxy:latest
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      RUST_LOG: info
+      WQC_ORCHESTRATOR_PRIVATE_KEY: ${WQC_ORCHESTRATOR_PRIVATE_KEY:?set WQC_ORCHESTRATOR_PRIVATE_KEY in examples/.env}
+      WQC_P2P_LISTEN_PORT: "4001"
+      WQC_P2P_PROXY_UDS: /var/run/wqc-p2p-01.sock
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.3.12
+    ports:
+      - "4001:4001/tcp"
+      - "4001:4001/udp"
+    volumes:
+      - ../../wqc-p2p-proxy:/app
+      - wqc-sockert:/var/run
+    command: sh -c "cargo build --release -q && /app/target/release/wqc-p2p-proxy"
+    depends_on:
+      wqc-orchestrator-01:
+        condition: service_started
+
+  wqc-core-01:
+    <<: *core-base
+    container_name: wqc-core-01
+    environment:
+      RUST_BACKTRACE: "1"
+      WQC_CONNECTION_MODE: uds
+      WQC_SOCKET_PATH: /var/run/wqc-core-01.sock
+      WQC_STARK_DEBUG_AIR: "1"
+      WQC_MPS_MAX_BOND_DIM: "128"
+      WQC_TN_BACKEND: webgpu
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.1.11
+    command: >
+      sh -c "cp /Cargo.lock /app/Cargo.lock 2>/dev/null || true && wqc-core"
+
+  wqc-core-02:
+    <<: *core-base
+    container_name: wqc-core-02
+    environment:
+      RUST_BACKTRACE: "1"
+      WQC_CONNECTION_MODE: tcp
+      WQC_MPS_MAX_BOND_DIM: "128"
+      WQC_TN_BACKEND: webgpu
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.1.12
+    ports:
+      - "3002:3000"
+
+  wqc-core-03:
+    <<: *core-base
+    container_name: wqc-core-03
+    environment:
+      RUST_BACKTRACE: "1"
+      WQC_CONNECTION_MODE: uds
+      WQC_SOCKET_PATH: /var/run/wqc-core-03.sock
+      WQC_MPS_MAX_BOND_DIM: "128"
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.1.13
+
+  wqc-core-04:
+    <<: *core-base
+    container_name: wqc-core-04
+    environment:
+      RUST_BACKTRACE: "1"
+      WQC_CONNECTION_MODE: tcp
+      WQC_MPS_MAX_BOND_DIM: "128"
+      WQC_TN_BACKEND: webgpu
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.1.14
+    ports:
+      - "3004:3000"
+
+  wqc-core-05:
+    <<: *core-base
+    container_name: wqc-core-05
+    environment:
+      RUST_BACKTRACE: "1"
+      WQC_CONNECTION_MODE: uds
+      WQC_SOCKET_PATH: /var/run/wqc-core-05.sock
+      WQC_MPS_MAX_BOND_DIM: "128"
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.1.15
+
+  wqc-node-01:
+    <<: *node-base
+    container_name: wqc-node-01
+    environment:
+      WQC_COMPUTE_TIMEOUT_SECS: "300"
+      WQC_RESULT_RETRY_INTERVAL_SECS: "5"
+      WQC_P2P_LISTEN_PORT: "4002"
+      WQC_NODE_PRIVATE_KEY: ${WQC_NODE_01_PRIVATE_KEY:?set WQC_NODE_01_PRIVATE_KEY in examples/.env}
+      WQC_NODE_STAKE_WQC: "0.05"
+      WQC_CORE_URL: unix:/var/run/wqc-core-01.sock
+      WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
+      WQC_DATABASE_URL: sqlite:wqc-node-01.db
+      WQC_MAX_MEMORY_GB: "1"
+      WQC_TESTNET_NODE_KEY: ${WQC_NODE_01_TESTNET_KEY:?set WQC_NODE_01_TESTNET_KEY in examples/.env}
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.2.11
+    depends_on:
+      - wqc-core-01
+
+  wqc-node-02:
+    <<: *node-base
+    container_name: wqc-node-02
+    environment:
+      WQC_COMPUTE_TIMEOUT_SECS: "300"
+      WQC_RESULT_RETRY_INTERVAL_SECS: "5"
+      WQC_P2P_LISTEN_PORT: "4002"
+      WQC_NODE_PRIVATE_KEY: ${WQC_NODE_02_PRIVATE_KEY:?set WQC_NODE_02_PRIVATE_KEY in examples/.env}
+      WQC_NODE_STAKE_WQC: "0.05"
+      WQC_CORE_URL: http://wqc-core-02:3000
+      WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
+      WQC_DATABASE_URL: sqlite:wqc-node-02.db
+      WQC_MAX_MEMORY_GB: "1"
+      WQC_TESTNET_NODE_KEY: ${WQC_NODE_02_TESTNET_KEY:?set WQC_NODE_02_TESTNET_KEY in examples/.env}
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.2.12
+    depends_on:
+      - wqc-core-02
+
+  wqc-node-03:
+    <<: *node-base
+    container_name: wqc-node-03
+    environment:
+      WQC_COMPUTE_TIMEOUT_SECS: "300"
+      WQC_RESULT_RETRY_INTERVAL_SECS: "5"
+      WQC_P2P_LISTEN_PORT: "4002"
+      WQC_NODE_PRIVATE_KEY: ${WQC_NODE_03_PRIVATE_KEY:?set WQC_NODE_03_PRIVATE_KEY in examples/.env}
+      WQC_NODE_STAKE_WQC: "0.05"
+      WQC_CORE_URL: unix:/var/run/wqc-core-03.sock
+      WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
+      WQC_DATABASE_URL: sqlite:wqc-node-03.db
+      WQC_MAX_MEMORY_GB: "1"
+      WQC_TESTNET_NODE_KEY: ${WQC_NODE_03_TESTNET_KEY:?set WQC_NODE_03_TESTNET_KEY in examples/.env}
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.2.13
+    depends_on:
+      - wqc-core-03
+
+  wqc-node-04:
+    <<: *node-base
+    container_name: wqc-node-04
+    environment:
+      WQC_COMPUTE_TIMEOUT_SECS: "300"
+      WQC_RESULT_RETRY_INTERVAL_SECS: "5"
+      WQC_P2P_LISTEN_PORT: "4002"
+      WQC_NODE_PRIVATE_KEY: ${WQC_NODE_04_PRIVATE_KEY:?set WQC_NODE_04_PRIVATE_KEY in examples/.env}
+      WQC_NODE_STAKE_WQC: "0.05"
+      WQC_CORE_URL: http://wqc-core-04:3000
+      WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
+      WQC_DATABASE_URL: sqlite:wqc-node-04.db
+      WQC_MAX_MEMORY_GB: "1"
+      WQC_TESTNET_NODE_KEY: ${WQC_NODE_04_TESTNET_KEY:?set WQC_NODE_04_TESTNET_KEY in examples/.env}
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.2.14
+    depends_on:
+      - wqc-core-04
+
+  wqc-node-05:
+    <<: *node-base
+    container_name: wqc-node-05
+    environment:
+      WQC_COMPUTE_TIMEOUT_SECS: "300"
+      WQC_RESULT_RETRY_INTERVAL_SECS: "5"
+      WQC_P2P_LISTEN_PORT: "4002"
+      WQC_NODE_PRIVATE_KEY: ${WQC_NODE_05_PRIVATE_KEY:?set WQC_NODE_05_PRIVATE_KEY in examples/.env}
+      WQC_NODE_STAKE_WQC: "0.05"
+      WQC_CORE_URL: unix:/var/run/wqc-core-05.sock
+      WQC_BOOTSTRAP_URLS: http://wqc-orchestrator-01:9000/api/v1/p2p/bootstrap
+      WQC_DATABASE_URL: sqlite:wqc-node-05.db
+      WQC_MAX_MEMORY_GB: "1"
+      WQC_TESTNET_NODE_KEY: ${WQC_NODE_05_TESTNET_KEY:?set WQC_NODE_05_TESTNET_KEY in examples/.env}
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.2.15
+    depends_on:
+      - wqc-core-05

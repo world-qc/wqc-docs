@@ -6,6 +6,9 @@ SIGNOFF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 E2E_ROOT="$(cd "$SIGNOFF_ROOT/.." && pwd)"
 EXAMPLES_ROOT="$(cd "$E2E_ROOT/.." && pwd)"
 CIRCUITS_ROOT="$EXAMPLES_ROOT/circuits"
+if [[ -z "${COMPOSE_DIR:-}" && -f "$EXAMPLES_ROOT/compose.yml" ]]; then
+  COMPOSE_DIR="$EXAMPLES_ROOT"
+fi
 ORCH_URL="${ORCH_URL:-http://localhost:9001}"
 SIGNOFF_DIR="${SIGNOFF_DIR:-/tmp/wqc-signoff-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$SIGNOFF_DIR"
@@ -22,7 +25,7 @@ require_orch() {
 
 require_compose_dir() {
   [[ -n "${COMPOSE_DIR:-}" && -f "${COMPOSE_DIR}/compose.yml" ]] \
-    || die "COMPOSE_DIR must point to a directory containing compose.yml — see examples/E2E.md §7"
+    || die "COMPOSE_DIR must point to a directory containing compose.yml — see examples/E2E.md §2 and examples/compose.yml"
 }
 
 # Node images may lack curl; share the node's network namespace from a curl sidecar.

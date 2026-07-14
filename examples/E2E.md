@@ -3,7 +3,7 @@
 Human-facing guide for manual submits, the curated regression harness, and signoff drills.
 Submit payloads live in [`circuits/`](circuits/); runners in [`e2e/`](e2e/).
 
-This document defines a **reference E2E stack** (logical services and URLs). It does not depend on any private compose checkout. Bring up a stack that satisfies §2, then run the scripts from this repository.
+This document defines a **reference E2E stack** (logical services and URLs). Bring up a stack that satisfies §2 — including the bundled [`compose.yml`](compose.yml) sample — then run the scripts from this repository.
 
 ## 1. Purpose and scope
 
@@ -26,6 +26,59 @@ Minimum logical layout for the harness in this repo:
 | **Object store** | S3-compatible bucket for manifests and proofs; presigned GET URLs on completed tasks | Host rewrite: internal hostname → reachable host (see §4) |
 | **Worker swarm** | ≥ **5** nodes online for full signoff; ≥ **3** for `security_level=ultra` quorum drills | P2P bootstrap from orchestrator |
 | **Core workers** | One compute container/process per bid-capable node | Image tag recorded in E2E logs |
+
+### Sample Docker Compose
+
+A minimal reference stack matching the container names and ports assumed by the E2E scripts is bundled as [`compose.yml`](compose.yml).
+
+| Service | Role |
+| --- | --- |
+| `wqc-redis` | Economy store (`6379`) |
+| `wqc-s3-storage` | Object store / MinIO (`9000`, console `9090`) |
+| `wqc-orchestrator-01` | Orchestrator HTTP (`9001` → container `:9000`) |
+| `wqc-p2p-proxy-01` | P2P hub (`4001` tcp/udp) |
+| `wqc-core-01` … `wqc-core-05` | Compute workers (shared UDS volume) |
+| `wqc-node-01` … `wqc-node-05` | Worker nodes (5 required for full signoff) |
+
+**Layout requirement:** `compose.yml` expects `wqc-docs` inside the World QC monorepo (sibling checkouts of `wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-p2p-proxy`, `wqc-stark-engine`). See the header comment in [`compose.yml`](compose.yml).
+
+**Secrets:** [`compose.yml`](compose.yml) does not embed credentials. Copy [`.env.example`](.env.example) to `examples/.env`, then fill values before starting the stack.
+
+**Ed25519 keys (orchestrator + nodes):** use [wqc-keygen](https://github.com/world-qc/wqc-keygen) — the shared utility for `wqc-node` and `wqc-orchestrator` identity. It prints a base64 private seed and the matching public key in one step.
+
+```bash
+# Docker (no local Rust required)
+docker build -t wqc-keygen https://github.com/world-qc/wqc-keygen.git
+docker run --rm wqc-keygen generate
+
+# Or from a checkout
+cargo run -- generate
+
+# Re-derive public key from an existing private seed
+docker run --rm wqc-keygen from-private "<PRIVATE_KEY>"
+```
+
+| `.env` variable | How many | Notes |
+| --- | --- | --- |
+| `WQC_ORCHESTRATOR_PRIVATE_KEY` | 1 | **Same** value on orchestrator and p2p-proxy |
+| `WQC_NODE_01_PRIVATE_KEY` … `05` | 5 | One `generate` run per node |
+| `WQC_NODE_XX_TESTNET_KEY` (`nk_…`) | 5 | Testnet operator key (separate from Ed25519; dashboard / registration) |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | 1 | Object-store credentials (any strong local values) |
+
+Do not commit `examples/.env`.
+
+**Start (from `wqc-docs` repo root):**
+
+```bash
+cp examples/.env.example examples/.env   # edit — do not commit .env
+docker compose -f examples/compose.yml up -d
+curl -sf http://127.0.0.1:9001/health
+export ORCH_URL=http://127.0.0.1:9001
+export COMPOSE_DIR="$PWD/examples"
+TIER=fast ./examples/e2e/run_e2e.sh
+```
+
+Omitted from the sample (not required for examples E2E): reverse proxy, dashboards, testnet UI, Prometheus/Grafana.
 
 ### Billing and quorum
 
@@ -54,11 +107,11 @@ Scripts assume conventional container names when `docker` is available. Override
 | `ORCH_CONTAINER` | `wqc-orchestrator-01` | `04_orch_restart.sh`, failure logs |
 | Object store admin | `wqc-s3-storage` | manifest fallback via `mc cat` |
 
-Signoff drills that **stop/start** services additionally require:
+Signoff drills that **stop/start** services use Docker Compose:
 
 | Variable | Meaning |
 | --- | --- |
-| `COMPOSE_DIR` | Directory containing **`compose.yml`** for your reference stack (no default — you must set this) |
+| `COMPOSE_DIR` | Directory containing [`compose.yml`](compose.yml) (default: `examples/` in this repo when present) |
 
 ## 3. Prerequisites
 
@@ -66,7 +119,7 @@ Tools:
 
 - `curl`, `jq`
 - `redis-cli` **or** Docker access to the economy Redis container
-- For signoff drills 03–06: `docker`, `COMPOSE_DIR` pointing at your stack
+- For signoff drills 03–06: `docker`, [`compose.yml`](compose.yml) (set `COMPOSE_DIR` if not using the default)
 
 From a clone of **this repository** (`wqc-docs`):
 
@@ -205,11 +258,14 @@ Exit code **0** = all selected cases reached `completed` **and** passed manifest
 
 Harness: [`e2e/signoff/`](e2e/signoff/) — reproducible E2E plus recovery and fault exercises.
 
-**Prerequisites:** §2 reference stack running; `COMPOSE_DIR` set for drills that restart or stop containers.
+**Prerequisites:** §2 reference stack running; [`compose.yml`](compose.yml) for drills that restart or stop containers.
 
 ```bash
 export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
-export COMPOSE_DIR=/path/to/your/stack   # directory with compose.yml
+export COMPOSE_DIR="${COMPOSE_DIR:-$PWD/examples}"   # wqc-docs repo root
+
+docker compose -f "$COMPOSE_DIR/compose.yml" up -d
+curl -sf "$ORCH_URL/health"
 
 cd examples/e2e/signoff
 ./run_signoff.sh                 # fast + all + drills
@@ -229,7 +285,7 @@ Drill-specific variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `COMPOSE_DIR` | **Required** for 03–06 when using `docker compose` stop/start |
+| `COMPOSE_DIR` | Directory with [`compose.yml`](compose.yml); default `examples/` when running from this repo |
 | `ORCH_SRC` | Optional path to `wqc-orchestrator` checkout for `go test` in drill 05 |
 | `SIGNOFF_DIR` | Artifact root (default `/tmp/wqc-signoff-<timestamp>`) |
 

@@ -6,7 +6,7 @@ Fill after a full `./run_signoff.sh` (or equivalent manual run). Do not commit r
 | --- | --- |
 | Date (UTC or local) | |
 | Host / operator | |
-| Reference stack | See `examples/E2E.md` §2 (`COMPOSE_DIR` if used) |
+| Reference stack | [`examples/compose.yml`](../../compose.yml) (see [`E2E.md`](../../E2E.md) §2) |
 | Orchestrator URL | `http://localhost:9001` |
 | Core image digest | |
 | Signoff log dir | `/tmp/wqc-signoff-…` |

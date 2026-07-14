@@ -1,16 +1,16 @@
 # E2E signoff harness
 
-Reproducible normal-path E2E plus recovery and fault drills. Target stack is defined in [`../../E2E.md`](../../E2E.md) §2 (reference E2E stack).
+Reproducible normal-path E2E plus recovery and fault drills. Target stack: [`../../E2E.md`](../../E2E.md) §2 and [`../../compose.yml`](../../compose.yml).
 
 ## Prerequisites
 
-1. A running stack that satisfies [`E2E.md` §2](../../E2E.md#2-reference-e2e-stack).
-2. For drills 03–06: set **`COMPOSE_DIR`** to the directory containing your stack’s `compose.yml`.
+1. Reference stack up (`docker compose -f examples/compose.yml up -d` from `wqc-docs` root).
+2. `COMPOSE_DIR` points at the directory containing `compose.yml` (defaults to `examples/` when using the bundled sample).
 3. Orchestrator reachable at `ORCH_URL` (default `http://127.0.0.1:9001`).
 
 ```bash
 export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
-export COMPOSE_DIR=/path/to/your/stack
+export COMPOSE_DIR="${COMPOSE_DIR:-$PWD/examples}"
 curl -sf "$ORCH_URL/health"
 ```
 

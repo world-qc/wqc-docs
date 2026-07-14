@@ -8,18 +8,22 @@ Reference submit payloads and the **E2E harness** for regression against a WQC o
 
 | Path | Role |
 |------|------|
+| [`E2E.md`](E2E.md) | Human-facing E2E guide (reference stack + [`compose.yml`](compose.yml)) |
 | [`circuits/`](circuits/) | **SSOT** — all curated submit JSON (tutorial + regression) |
 | [`e2e/`](e2e/) | Runner: `manifest.tsv`, `run_e2e.sh`, `assert_manifest.sh`, `signoff/` |
-| [`E2E.md`](E2E.md) | Human-facing E2E documentation |
+| [`compose.yml`](compose.yml) | Sample Docker Compose for the reference E2E stack |
 
 Topic folders `basis/`, `slice/`, and `phase_c/` were merged into `circuits/` (see [`circuits/README.md`](circuits/README.md)).
 
 ## Quick run
 
-From the **`wqc-docs` repository root** (with a stack satisfying [`E2E.md` §2](E2E.md#2-reference-e2e-stack)):
+From the **`wqc-docs` repository root** (start the stack with [`compose.yml`](compose.yml) — see [`E2E.md` §2](E2E.md#sample-docker-compose)):
 
 ```bash
+cp examples/.env.example examples/.env   # fill secrets — see E2E.md
+docker compose -f examples/compose.yml up -d
 export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
+export COMPOSE_DIR="${COMPOSE_DIR:-$PWD/examples}"
 
 # fast suite (~30s) — 10 cases + golden manifest checks
 TIER=fast ./examples/e2e/run_e2e.sh

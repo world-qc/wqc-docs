@@ -12,7 +12,7 @@ This repository serves as the single source of truth for the World Quantum Compu
 | [`/whitepaper`](whitepaper/) | Present | Versioned English whitepapers (`WHITEPAPER_0.x_en.md` / PDF) and scope notes |
 | [`/spec`](spec/) | Present | Protocol specifications (see subdirectories) |
 | [`/spec/stark/`](spec/stark/) | Present | STARK proof format, AIR constraints, aggregation, distribution binding |
-| [`/examples`](examples/) | Present | Circuit SSOT (`circuits/`) + E2E harness (`e2e/`) |
+| [`/examples`](examples/) | Present | Circuit SSOT, E2E harness, [`compose.yml`](examples/compose.yml) |
 | [`/examples/E2E.md`](examples/E2E.md) | Present | Reference-stack E2E guide (manual + automated + signoff) |
 | `/tokenomics` | Planned | Fair launch, burn, and reward schedule documentation |
 
