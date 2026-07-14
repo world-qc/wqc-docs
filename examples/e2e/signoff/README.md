@@ -17,7 +17,7 @@ Client credit is applied by `run_e2e.sh` (Redis `economy:client:client-01:balanc
 
 | Step | Script | What it proves |
 | --- | --- | --- |
-| 1 | `01_e2e_fast.sh` | Fast tier (9 cases) + manifest asserts |
+| 1 | `01_e2e_fast.sh` | Fast tier (10 cases) + manifest asserts |
 | 2 | `02_e2e_all.sh` | Full suite incl. slow `multislice_28q_zz` (**required for §6**) |
 | 3 | `03_node_restart.sh` | Node SQLite pending / outbox survive `docker restart` |
 | 4 | `04_orch_restart.sh` | Orchestrator restart → health + bootstrap + task progress |

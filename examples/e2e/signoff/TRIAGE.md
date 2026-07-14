@@ -62,7 +62,7 @@ Full table (escrow / burn / receipt): [`world-qc-docker/testnet/RUNBOOK.md`](../
 docker logs wqc-orchestrator-01 2>&1 | grep -E 'proof|Root proof|aggregation|tamper|signature' | tail -40
 ```
 
-Invalid peer bids are rejected at P2P receive (signature). Root proof failures fail the task (`proof aggregation failed`). Re-run a known-good curated case from `wqc-docs/examples/e2e/` before deep diving.
+Invalid peer bids are rejected at P2P receive (signature). Root proof failures fail the task (`proof aggregation failed`). Re-run a known-good curated case from `wqc-docs/examples/circuits/` (via `e2e/run_e2e.sh`) before deep diving.
 
 ---
 

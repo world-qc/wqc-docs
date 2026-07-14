@@ -15,7 +15,7 @@ mkdir -p "$OUT"
 
 log "==> 04_orch_restart orch=$ORCH"
 
-PAYLOAD="$E2E_ROOT/scalar_h2_amplitude.json"
+PAYLOAD="$CIRCUITS_ROOT/scalar/scalar_h2_amplitude.json"
 submit_json "$PAYLOAD" | tee "$OUT/submit.json" >/dev/null
 tid="$(jq -r '.task_id' "$OUT/submit.json")"
 [[ -n "$tid" && "$tid" != null ]] || { record_fail "04_orch_restart" "submit failed"; exit 1; }

@@ -20,7 +20,7 @@ before="$(node_status "$NODE" || true)"
 echo "$before" | tee "$OUT/status_before.json" | jq -c '{pending_tasks,outbox_pending,max_qubits,max_memory_gib}' || true
 
 # Prefer a short-lived but real task so restart may land mid-flight or shortly after.
-PAYLOAD="$E2E_ROOT/sample_bell_counts.json"
+PAYLOAD="$CIRCUITS_ROOT/sample/sample_bell_counts.json"
 submit_json "$PAYLOAD" | tee "$OUT/submit.json" >/dev/null
 tid="$(jq -r '.task_id' "$OUT/submit.json")"
 [[ -n "$tid" && "$tid" != null ]] || { record_fail "03_node_restart" "submit failed"; exit 1; }

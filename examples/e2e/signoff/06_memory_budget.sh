@@ -50,7 +50,7 @@ EOF
 
 # Light capability check: small task should complete with all nodes up
 ensure_client_credit
-submit_json "$E2E_ROOT/scalar_h2_amplitude.json" | tee "$OUT/submit.json" >/dev/null
+submit_json "$CIRCUITS_ROOT/scalar/scalar_h2_amplitude.json" | tee "$OUT/submit.json" >/dev/null
 tid="$(jq -r '.task_id' "$OUT/submit.json")"
 st="$(wait_task_terminal "$tid" 180 || true)"
 echo "{\"task_id\":\"$tid\",\"final_status\":\"$st\"}" | tee "$OUT/task_final.json"

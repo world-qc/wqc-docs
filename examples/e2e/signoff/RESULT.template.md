@@ -16,8 +16,8 @@ Fill after a full `./run_signoff.sh` (or equivalent manual run). Do not commit r
 
 | Item | Pass? | Evidence |
 | --- | --- | --- |
-| `TIER=fast` E2E (9/9 + asserts) | | log dir / exit 0 |
-| `TIER=all` E2E (incl. slow) | | log dir / exit 0 |
+| `TIER=fast` E2E (10/10 + asserts) | | log dir / exit 0 |
+| `TIER=all` E2E (11/11 incl. slow) | | log dir / exit 0 |
 | Node restart (pending/outbox) | | `03_node_restart` notes |
 | Orchestrator restart | | `04_orch_restart` notes |
 | Quorum fault / recovery | | `05_fault_injection` notes |

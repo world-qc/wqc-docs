@@ -1,12 +1,12 @@
 # name	file	timeout_sec	tier	notes
-scalar_h2_amplitude	scalar_h2_amplitude.json	90	fast	§3.4 scalar: H+CNOT Bell → amplitude real≈1/√2; 1 slice
-sample_bell_counts	sample_bell_counts.json	90	fast	§3.4.2 sample_counts: Bell 00/11 only; shots=512
-expectation_xz	expectation_xz.json	90	fast	§3.4.2b expectation: |+⟩ → ⟨X⟩≈1 ⟨Z⟩≈0
-multislice_4q_counts	multislice_4q_counts.json	120	fast	§2.5 MP1: q0–q1 idle assignments; measure q2–q3
-mid_circuit_if_measure	mid_circuit_if_measure.json	120	fast	Phase C1: MEASURE → IF(X) → MEASURE; 00+11
-multislice_4q_mid_circuit_if	multislice_4q_mid_circuit_if.json	120	fast	C2c: MP1 idle q0–q1 + mid-circuit IF on q2–q3; trajectory zk
-noise_depolarizing_counts	noise_depolarizing_counts.json	120	fast	Phase C3: noise_model meta; 1q H+MEASURE
-tn_cut_scalar_28q	tn_cut_scalar_28q.json	180	fast	§2.1 TN cut: 28q→4 slices; orch log edge_id=e_2 first
-x_basis_sample_counts	../basis/x_sample_counts.json	90	fast	§3.4.2b X-basis: H,H+MEASURE → counts {0:1024}
-y_basis_sample_counts	../basis/y_sample_counts.json	90	fast	§3.4.2b Y-basis: RX(±π/2)+MEASURE → counts {0:1024}
-multislice_28q_zz	multislice_28q_zz.json	300	slow	§2.5 OP1: 28q ZZ on q26–q27; ⟨ZZ⟩≈1
+scalar_h2_amplitude	../circuits/scalar/scalar_h2_amplitude.json	90	fast	§3.4 scalar: H+CNOT Bell → amplitude real≈1/√2; 1 slice
+sample_bell_counts	../circuits/sample/sample_bell_counts.json	90	fast	§3.4.2 sample_counts: Bell 00/11 only; shots=512
+expectation_xz	../circuits/expectation/expectation_xz.json	90	fast	§3.4.2b expectation: |+⟩ → ⟨X⟩≈1 ⟨Z⟩≈0
+multislice_4q_counts	../circuits/multislice/multislice_4q_counts.json	120	fast	§2.5 MP1: q0–q1 idle assignments; measure q2–q3
+mid_circuit_if_measure	../circuits/mid_circuit/mid_circuit_if_measure.json	120	fast	Phase C1: MEASURE → IF(X) → MEASURE; 00+11
+multislice_4q_mid_circuit_if	../circuits/mid_circuit/multislice_4q_mid_circuit_if.json	120	fast	C2c: MP1 idle q0–q1 + mid-circuit IF on q2–q3; trajectory zk
+noise_depolarizing_counts	../circuits/noise/noise_depolarizing_counts.json	120	fast	Phase C3: noise_model meta; 1q H+MEASURE
+tn_cut_scalar_28q	../circuits/scalar/tn_cut_scalar_28q.json	180	fast	§2.1 TN cut: 28q→4 slices; orch log edge_id=e_2 first
+x_basis_sample_counts	../circuits/sample/x_basis_sample_counts.json	90	fast	§3.4.2b X-basis: H,H+MEASURE → counts {0:1024}
+y_basis_sample_counts	../circuits/sample/y_basis_sample_counts.json	90	fast	§3.4.2b Y-basis: RX(±π/2)+MEASURE → counts {0:1024}
+multislice_28q_zz	../circuits/expectation/multislice_28q_zz.json	300	slow	§2.5 OP1: 28q ZZ on q26–q27; ⟨ZZ⟩≈1

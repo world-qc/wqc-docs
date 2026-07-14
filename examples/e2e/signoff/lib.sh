@@ -4,6 +4,8 @@ set -euo pipefail
 
 SIGNOFF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 E2E_ROOT="$(cd "$SIGNOFF_ROOT/.." && pwd)"
+EXAMPLES_ROOT="$(cd "$E2E_ROOT/.." && pwd)"
+CIRCUITS_ROOT="$EXAMPLES_ROOT/circuits"
 REPO_ROOT="$(cd "$SIGNOFF_ROOT/../../../.." && pwd)"
 ORCH_URL="${ORCH_URL:-http://localhost:9001}"
 COMPOSE_DIR="${COMPOSE_DIR:-$REPO_ROOT/world-qc-docker/devnet}"

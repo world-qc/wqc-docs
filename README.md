@@ -10,11 +10,10 @@ This repository serves as the single source of truth for the World Quantum Compu
 | Path | Status | Contents |
 |------|--------|----------|
 | [`/whitepaper`](whitepaper/) | Present | Versioned English whitepapers (`WHITEPAPER_0.x_en.md` / PDF) and scope notes |
-| [`/examples`](examples/) | Present | Reference circuits, e2e scripts, and topic READMEs (`basis`, `slice`, `phase_c`, `e2e`) |
-| [`/spec`](spec/) | Planned | API and networking specifications for the WQC swarm |
-| `/manifesto` | Planned | Declaration against centralized quantum hegemony |
+| [`/spec`](spec/) | Present | Protocol specifications (see subdirectories) |
+| [`/spec/stark/`](spec/stark/) | Present | STARK proof format, AIR constraints, aggregation, distribution binding |
+| [`/examples`](examples/) | Present | Circuit SSOT (`circuits/`) + E2E harness (`e2e/`) |
 | `/tokenomics` | Planned | Fair launch, burn, and reward schedule documentation |
-| `/yellowpaper` | Planned | Formal protocol / cryptography detail (may also live under `/whitepaper` or `/spec` until split) |
 
 Directories marked **Planned** may be empty or absent until the corresponding documents are published.
 
