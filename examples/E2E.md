@@ -346,5 +346,5 @@ Update this section when re-running against your reference stack.
 | Date | 2026-07-14 |
 | `TIER=fast` | 10/10 `completed` + manifest assertions |
 | `TIER=all` | 11/11 incl. slow `multislice_28q_zz` |
-| Logs | `/tmp/wqc-e2e-20260714-140909` (fast), `/tmp/wqc-e2e-all-20260714-141026` (all) |
+| Signoff | [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) — drills PASS (logs `/tmp/wqc-signoff-20260714-210250`) |
 | Core image | `sha256:e969910473a7dab3b2400d7e6b4e1db1d46d310e2c46755c2d7937c2d8d52bb0` |

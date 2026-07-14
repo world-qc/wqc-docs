@@ -30,14 +30,17 @@ log "task_id=$tid"
 sleep 2
 docker restart "$NODE" | tee "$OUT/restart.txt"
 # Wait for admin HTTP
-for _ in $(seq 1 30); do
+for _ in $(seq 1 90); do
   if node_status "$NODE" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-after="$(node_status "$NODE")"
+if ! after="$(node_status "$NODE")"; then
+  record_fail "03_node_restart" "admin /status unreachable after restart (task=$tid)"
+  exit 1
+fi
 echo "$after" | tee "$OUT/status_after.json" | jq -c '{pending_tasks,outbox_pending,max_qubits,max_memory_gib,health}' || true
 
 # Task should still reach a terminal state via remaining nodes / retries.
