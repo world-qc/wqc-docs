@@ -5,6 +5,8 @@ Submit payloads live in [`circuits/`](circuits/); runners in [`e2e/`](e2e/).
 
 This document defines a **reference E2E stack** (logical services and URLs). Bring up a stack that satisfies §2 — including the bundled [`compose.yml`](compose.yml) sample — then run the scripts from this repository.
 
+**Images:** the sample compose file builds from sibling World QC repos in a monorepo checkout (`../../wqc-core`, `../../wqc-node`, …). Cloning only `wqc-docs` is not enough to `docker compose up` unless you already have equivalent images and retarget the compose file.
+
 ## 1. Purpose and scope
 
 | Suite | Cases | Runtime (typical) | What it proves |

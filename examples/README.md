@@ -4,6 +4,8 @@ Reference submit payloads and the **E2E harness** for regression against a WQC o
 
 **Full guide:** [`E2E.md`](E2E.md) — reference stack definition, manual submit, automated runner, signoff, and triage.
 
+**Compose prerequisite:** [`compose.yml`](compose.yml) builds from sibling monorepo checkouts (`wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-p2p-proxy`, `wqc-stark-engine`). A standalone clone of `wqc-docs` alone cannot build those images — use the monorepo layout, or pre-built images that satisfy the [reference E2E stack](E2E.md#2-reference-e2e-stack).
+
 ## Layout
 
 | Path | Role |
