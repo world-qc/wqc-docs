@@ -1,7 +1,7 @@
 # wqc-docs (The Archive)
 
 [![License: GFDL-1.3](https://img.shields.io/badge/License-GFDL--1.3-blue.svg)](https://www.gnu.org/licenses/fdl-1.3.html)
-[![Documentation](https://img.shields.io/badge/Docs-Official-blue.svg)](https://world-qc.io/docs)
+[![Whitepaper](https://img.shields.io/badge/Whitepaper-Latest-blue.svg)](https://world-qc.io/docs/WHITEPAPER_en.pdf)
 
 This repository serves as the single source of truth for the World Quantum Computer (WQC) protocol. It contains the mathematical foundations, economic models, and philosophical manifestos of the project.
 
