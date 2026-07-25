@@ -198,6 +198,7 @@ curl -s "$ORCH_URL/api/v1/task/$TASK_ID" | jq .
 | --- | --- |
 | `pending` | Bidding / not yet dispatched |
 | `dispatched` | Slices in flight |
+| `finalizing` | All slice quorums done; PCS wait / compose / manifest seal |
 | `completed` | Manifest + `proof_root_hash` available |
 | `failed` | See `error` field |
 
