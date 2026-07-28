@@ -1,111 +1,110 @@
 # Zero-Knowledge STARKs for Trustless Distributed Quantum Simulation
 
-**A protocol specification for the World Quantum Computer (WQC) cryptographic proof engine**
+**A Formal Protocol Specification for the World Quantum Computer (WQC) Cryptographic Proof Engine**
 
 ---
 
 ## Abstract
 
-The World Quantum Computer (WQC) replaces energy-intensive, nondeterministic hash mining with *Deterministic Proof of Useful Work* (D-PoUW): workers contract slices of quantum circuits and produce cryptographically verifiable proofs of correct execution. This document specifies the zero-knowledge STARK (zk-STARK) subsystem that makes that claim enforceable. We describe the public-input binding that anchors each proof to a dispatched task, the Algebraic Intermediate Representation (AIR) for unitary execution traces, auxiliary proofs that bind Born-rule sampling and mid-circuit measurement trajectories, and a binary composition tree with an aggregation STARK that reduces root verification to effectively constant cost. The design is transparency-first (no trusted setup), field-native over Mersenne31 with Circle polynomial commitment, and engineered so that verification cost grows slowly while proving cost—and therefore useful quantum work—absorbs the economic load of consensus.
+The World Quantum Computer (WQC) architecture replaces traditional energy-intensive, non-deterministic hash-based Proof-of-Work (PoW) with *Deterministic Proof of Useful Work* (D-PoUW). Under this paradigm, distributed worker nodes contract tensor-network or statevector slices of quantum circuits and generate succinct, cryptographically verifiable proofs of correct execution. This document presents the formal technical specification for WQC's zero-knowledge Scalable Transparent Argument of Knowledge (zk-STARK) proof system. We define the public-input binding mechanism anchoring proofs to dispatched sub-tasks, the Algebraic Intermediate Representation (AIR) for unitary gate execution traces, auxiliary proof extensions for Born-rule sampling and mid-circuit measurement trajectories, and a recursive binary composition tree driven by an aggregation STARK that achieves $\mathcal{O}(1)$ verification time. Designed for post-quantum transparency (requiring no trusted setup), the engine operates natively over the Mersenne31 field using Circle Polynomial Commitment Schemes (PCS). The protocol ensures that proving costs track useful quantum simulation while verification costs remain polylogarithmic to support light-client and on-chain consensus settlement.
 
 ---
 
 ## 1. Introduction
 
-### 1.1 Background: from Fortress Computing to a Neural Swarm
+### 1.1 Background: From Fortress Computing to a Neural Swarm
 
-Quantum computation is presently concentrated in facilities that resemble digital fortresses: scarce machines, closed APIs, and institutional gatekeepers. That concentration is not only an access problem; it is a *trust* problem. A client who outsources a molecular energy estimate or an optimization landscape to a third party has, in the classical model, almost no way to know whether the returned histogram was simulated honestly, truncated early, or fabricated to fit a preferred narrative.
+High-performance quantum computation has historically been centralized within monolithic, closed-access physical infrastructure. This concentration introduces significant trust boundaries. A client delegating quantum state vector evolution or variational algorithm evaluation to an unverified third party cannot independently validate whether the returned probability distribution was computed honestly, truncated early, or entirely fabricated.
 
-At the same time, blockchain systems have demonstrated that global consensus without a central arbiter is possible—but at the price of *Proof of Work* (PoW) whose useful output is often zero. Conventional PoW converts energy into entropy for the sake of Sybil resistance. From a thermodynamic and social perspective, that bargain is increasingly indefensible: the planet pays for hash collisions while scientific and industrial workloads remain hungry for cycles.
+Conversely, public blockchain networks establish decentralized consensus at the expense of computational utility. Conventional PoW mechanisms convert massive electrical power into thermodynamic entropy solely for Sybil resistance. WQC unifies these two paradigms by redirecting consensus work toward useful quantum circuit execution. By partitioning complex quantum circuits across a heterogeneous network of worker nodes—termed the *Neural Swarm*—computational energy spent securing the consensus layer directly translates into scientific simulation throughput. Each worker contracts assigned sub-circuits, emitting verifiable cryptographic arguments of correct execution.
 
-WQC’s premise is that those two crises share a solution. If the work that secures a ledger is *itself* quantum-circuit simulation—partitioned across commodity GPUs and unified-memory devices, and accompanied by succinct mathematical proofs—then security spend becomes scientific throughput. Tens of thousands of worker nodes form a *Neural Swarm* that cooperatively contracts tensor-network representations of circuits too large for any single machine’s statevector, yet each contribution remains independently checkable.
+### 1.2 The Verification Bottleneck
 
-### 1.2 The verification bottleneck
+Centralized re-execution of distributed simulation slices eliminates the performance and decentralization benefits of the network. Furthermore, verifying full $2^n$-dimensional state vectors on-chain is computationally intractable. Succinct arguments of knowledge ($\pi$) address this bottleneck by allowing a verifier to validate execution integrity in time polylogarithmic to the trace length.
 
-Distributed simulation alone is not enough. An orchestrator that re-executes every slice would recreate the very centralization WQC seeks to abolish; an on-chain verifier that inspects gigabyte traces would never settle. The classical cryptographic answer is an *argument of knowledge*: a short string $\pi$ that convinces a verifier that a claim is true without replaying the computation.
+Applying STARKs to quantum circuit simulation requires addressing three distinct technical hurdles:
 
-For quantum simulation specifically, three additional difficulties arise:
+1. **Dimensional Scaling:** Quantum state spaces grow exponentially as $2^n$. WQC resolves this by applying tensor-network cuts and idle-wire assignments to create smaller circuit slices, proving per-slice contractions rather than global state vectors.
+2. **Result Polymorphism:** Client execution requests vary by output mode, including scalar amplitudes (`statevector_scalar`), shot counts (`sample_counts`), or Pauli operator expectation values (`expectation`). Non-deterministic quantum sampling requires deterministic pseudorandom generator (PRNG) binding and Born-rule state commitments to prevent output manipulation.
+3. **Dynamic Circuit Execution:** Mid-circuit operations (`MEASURE`, `RESET`, and conditional gate execution) break pure unitary evolution. WQC bifurcates proofs into unitary sub-segments and measurement trajectory segments, cryptographically chaining them through state commitments.
 
-1. **Scale.** Statevectors grow as $2^n$. WQC therefore *slices* circuits (tensor-network cut / idle-wire assignment) and proves per-slice contractions rather than full amplitudes wherever possible.
-2. **Polymorphism of results.** Clients need amplitudes (`statevector_scalar`), shot histograms (`sample_counts`), or Pauli expectations (`expectation`). Sampling appears stochastic; without a bound seed and Born-rule commitment, remote histograms cannot be reconciled across dishonest workers.
-3. **Dynamic circuits.** Mid-circuit `MEASURE`, `RESET`, and classically controlled gates destroy the purely unitary model assumed by naive execution STARKs. Unitary segments and measurement trajectories must be proved separately and cryptographically linked.
+### 1.3 Cryptographic Foundation: zk-STARKs
 
-### 1.3 Why zk-STARKs
+STARKs provide specific structural properties tailored for distributed quantum proof generation:
 
-Among succinct proof systems, STARKs (*Scalable Transparent Arguments of Knowledge*) are particularly well matched to WQC’s threat and deployment model:
-
-| Property | Relevance to WQC |
+| Property | Protocol Relevance |
 | --- | --- |
-| **Transparency** | No ceremony, no toxic waste. Anyone can verify proofs produced by anonymous workers. |
-| **Hash-based security** | Avoids elliptic-curve pairings and long-term pairing assumptions; FRI relies on collision-resistant hashing and coding theory. |
-| **Scalability** | Proving is quasi-linear in the trace; verification is polylogarithmic—exactly the asymmetry needed for D-PoUW. |
-| **Air-native circuits** | Quantum gate transitions map naturally onto Algebraic Intermediate Representations over finite fields. |
-| **Post-quantum trajectory** | Hash-based proof systems are among the leading candidates for quantum-safe arguments. |
+| **Transparency** | Eliminates trusted setup ceremonies and toxic waste, enabling anonymous worker participation. |
+| **Hash-Based Security** | Relies on collision-resistant hash functions and the Fast Reed-Solomon Interactive Proof of Proximity (FRI), avoiding pairing assumptions. |
+| **Asymmetric Scalability** | Prover time is quasi-linear in trace length $\mathcal{O}(N \log N)$, whereas verifier time is polylogarithmic $\mathcal{O}(\log^2 N)$. |
+| **AIR Compatibility** | Transition polynomials naturally model discrete statevector gate transitions across field registers. |
+| **Post-Quantum Security** | Symmetric cryptographic foundations provide resilience against quantum cryptanalytic attacks. |
 
-WQC implements STARKs over the **Mersenne31** field using Polygon **Plonky3** with **Circle PCS**, with an earlier embedded-trace profile retained for auditing. Zero-knowledge extensions (`DistributionAir`, trajectory marginal / per-shot Bernoulli AIRs) further hide dense probability tables and event streams while still binding claimed sample counts to a deterministic seed.
+Production proof generation is configured over the Mersenne31 prime field using Polygon Plonky3 with Circle PCS. Zero-knowledge extensions (`DistributionAir`, trajectory marginals, and per-shot Bernoulli AIRs) preserve privacy over dense probability tables while strictly enforcing Born-rule compliance.
 
-### 1.4 Contributions of this specification
+### 1.4 Specification Scope
 
-This document consolidates the WQC STARK specification into a single narrative. It covers:
+This document specifies the complete cryptographic proof architecture of WQC:
 
-* Public-input binding and the roles of prover (worker), verifier (orchestrator), and compose nodes;
-* Unitary execution traces and AIR constraints over a gate alphabet including mid-circuit measurement;
-* Distribution and trajectory binding for deterministic sampling;
-* Recursive binary composition with aggregation STARKs (native verification tree, v4 `AggregationAir` digest attestation, and v6 `RecursiveAggregationAir` with leaf/agg PCS bundles and in-circuit out-of-domain checks);
-* Soft resource caps that delimit the present noiseless `sample_counts` regime;
-* Operational boundaries and ongoing protocol optimization (host verification parameters, multi-chunk quotient structures, and proof footprint optimization).
-
-Appendices B and C retain binary-level layouts for implementers; the present paper is the conceptual and protocol SSOT. See also the WQC whitepaper (§3.3–3.4) for economic motivation and recursive-aggregation vision.
+* Public-input binding schema linking task assignments to proof artifacts.
+* Algebraic Intermediate Representation (AIR) specifications for unitary execution.
+* Auxiliary probability distribution and measurement trajectory constraints.
+* Binary recursive composition trees, including v4 `AggregationAir` and v6 `RecursiveAggregationAir` with in-circuit out-of-domain (OOD) PCS verification.
+* Operational bounds, memory gating policies, and P2P Leaf PCS delivery workflows.
 
 ---
 
-## 2. System model
+## 2. System Model
 
-### 2.1 Actors
+### 2.1 Network Actors
 
-* **Client.** Submits a circuit under an output mode, funds escrow when billing is enabled, and receives a result plus a root proof.
-* **Orchestrator.** Cuts the circuit into slices, runs a bid / quorum session, dispatches work, verifies leaf and compose proofs, and seals a manifest root.
-* **Worker node.** Contracts a slice (via a local `wqc-core` instance), emits a STARK proof bound to the assigned public inputs, and returns the result over P2P.
-* **Aggregator / finalizer.** Builds the compose tree, optionally appends an aggregation STARK tail, and publishes `proof_root_hash` / `root.bin`.
+* **Client:** Formulates quantum circuit requests, specifies the target output mode, funds execution escrow, and receives final output results alongside a verified root proof $\pi_{\mathrm{Root}}$.
+* **Orchestrator:** Performs circuit decomposition (slicing), manages task bidding and quorum assignment, dispatches execution tasks to workers, validates leaf/composition proofs, and seals the final proof manifest.
+* **Worker Node:** Executes local slice contractions via `wqc-core`, generates corresponding leaf STARK proofs bound to public task parameters, and transmits results over P2P.
+* **Aggregator / Finalizer:** Constructs binary composition trees, executes recursive aggregation STARKs, and registers `proof_root_hash` and `root.bin` artifacts.
 
-### 2.2 Assets to protect
+### 2.2 Adversarial Threat Model
 
-A malicious worker may attempt: (i) substituting a different circuit or slice; (ii) returning a fabricated amplitude or histogram; (iii) front-running another node’s result; (iv) claiming Born-rule consistency without respecting the seed; (v) forging mid-circuit measurement outcomes. Public-input binding plus AIR / FRI checks are designed to make each of (i)–(v) detectable at verification time (subject to the resource caps in §9).
+The STARK subsystem guards against malicious worker behaviors, specifically targeting:
 
-### 2.3 Output modes and proof obligations
+1. Sub-task or circuit slice substitution.
+2. Fabrication of state vector scalar amplitudes or shot measurement histograms.
+3. Front-running or replaying proof artifacts from peer nodes.
+4. Generating non-deterministic sample outputs inconsistent with the assigned seed and Born distribution.
+5. Forging mid-circuit measurement outcomes.
 
-| Mode | Primary leaf claim | Auxiliary binding |
+### 2.3 Proof Obligations by Output Mode
+
+| Output Mode | Primary Leaf Claim | Auxiliary Binding Obligation |
 | --- | --- | --- |
-| `statevector_scalar` | Unitary contraction of a scalar amplitude | — |
-| `sample_counts` (terminal) | Unitary execution of the measured subcircuit | Born distribution + deterministic sampling |
-| `sample_counts` (mid-circuit) | Unitary segments between measures | Trajectory events + optional zk marginals / shots |
-| `expectation` | Algebraic expectation over the post-contraction state | (outside distribution STARKs; result hash still bound) |
+| `statevector_scalar` | Unitary contraction of a target amplitude scalar. | None. |
+| `sample_counts` (Terminal) | Unitary state evolution of the measured sub-circuit. | Born rule distribution commitment + deterministic PRNG sampling. |
+| `sample_counts` (Mid-Circuit) | Unitary segment traces bounded by measurement gates. | Sequential trajectory event stream + zk marginal/shot proofs. |
+| `expectation` | Algebraic expectation calculation over contracted state. | Result payload digest binding. |
 
 ---
 
-## 3. Preliminaries
+## 3. Mathematical Preliminaries
 
 ### 3.1 Algebraic Intermediate Representation (AIR)
 
-An AIR expresses computational integrity as polynomial constraints over a rectangular *execution trace*. Rows index time; columns hold registers (amplitudes, gate selectors, control flags). A valid proof attests that there exists a low-degree trace satisfying all constraints at every row (outside a quotient vanishing set), committed via a polynomial commitment scheme and opened with FRI.
+Computational logic is framed as an execution trace matrix $T \in \mathbb{F}^{T_{\mathrm{rows}} \times T_{\mathrm{cols}}}$. Valid state transitions are expressed as a set of multivariate transition polynomials $P_j(X_0, \dots, X_{W-1}, Y_0, \dots, Y_{W-1})$ such that $P_j(T_{i, \star}, T_{i+1, \star}) = 0$ for all valid row transitions $i$. The quotient polynomial $Q(X) = \frac{C(T(X))}{Z_H(X)}$ is committed via Circle PCS and evaluated at randomized out-of-domain challenge points using FRI.
 
-### 3.2 Field and PCS
+### 3.2 Field & Polynomial Commitment Scheme
 
-Production leaf proofs (transcript v2) use:
+* **Base Field:** Mersenne31 ($\mathbb{F}_p$, where $p = 2^{31} - 1$).
+* **Commitment Scheme:** Circle PCS implemented via Polygon Plonky3.
+* **Serialization:** Postcard serialization format encoding `p3_uni_stark::Proof` structures.
 
-* **Base field:** Mersenne31 ($\mathbb{F}_p$, $p = 2^{31}-1$).
-* **Commitment:** Circle PCS inside Plonky3.
-* **Encoding:** postcard serialization of `p3_uni_stark::Proof`.
-
-An earlier profile (v1) embeds the floating-point trace and asks the verifier to re-expand AIR columns and recompute a global constraint sum—useful for debugging, but not the scalability path.
+Legacy transcript profile v1 embeds uncompressed floating-point traces evaluated via explicit verifier sumchecks, whereas production profile v2 commits traces via Circle PCS.
 
 ### 3.3 Notation
 
-Let $\pi$ denote a proof artifact, $\mathsf{PI}$ the public-input vector, and $H$ the SHA3-256 digest function. Digests appear either as raw 32-byte hashes or as 64-character ASCII hex strings inside transcripts. String fields in binary formats are NUL-terminated.
+Let $\pi$ denote a proof artifact, $\mathsf{PI}$ the public-input vector, and $H(x)$ the SHA3-256 cryptographic digest function. Binary strings are represented as NUL-terminated C-strings, and digest values are represented either as raw 32-byte arrays or 64-character ASCII hexadecimal strings.
 
 ---
 
-## 4. Architecture overview
+## 4. Architecture Overview
 
 ```
                     ┌─────────────────────────┐
@@ -128,98 +127,103 @@ Let $\pi$ denote a proof artifact, $\mathsf{PI}$ the public-input vector, and $H
 
 ```
 
-**Transcript versions.**
+### Transcript Version Specification
 
-| Version | Marker | Mechanism |
+| Version | Header Marker | Protocol Mechanism |
 | --- | --- | --- |
-| v1 | `_M31_QUANTUM_AIR_V1_` | Embedded trace; recomputed AIR sum |
-| v2 | `_M31_PLONKY3_STARK_V2_` | Plonky3 FRI STARK over Circle PCS |
-| v3 | `_WQC_COMPOSE_V3_` | Binary child proofs + optional aggregation tail (v4 / v6) |
-
-Auxiliary markers attach to unitary bodies for sampling circuits (distribution, Born zk, trajectory, trajectory zk, aggregation). A comprehensive marker table appears in Appendix A.
-
-**Verification flow (summary).** Detect the marker; check public-input binding; run the version-specific verifier; for `sample_counts`, additionally verify that the deterministic sampling pipeline reproduces the claimed output hash.
+| **v1** | `_M31_QUANTUM_AIR_V1_` | Embedded trace with host-side re-expanded AIR sum validation. |
+| **v2** | `_M31_PLONKY3_STARK_V2_` | Production Plonky3 FRI STARK over Circle PCS. |
+| **v3** | `_WQC_COMPOSE_V3_` | Binary child composition container supporting v4/v6 aggregation tails. |
 
 ---
 
-## 5. Public inputs
+## 5. Public Input Binding Schema
 
-Every leaf proof binds a *StarkContext*:
+To prevent proof-swapping attacks, every leaf proof commits to a rigid `StarkContext` public input structure $\mathsf{PI}$:
 
-| Field | Required | Meaning |
+| Field Identifier | Enforcement | Functional Description |
 | --- | --- | --- |
-| `circuit_id` | yes | Hash of the pruned circuit subgraph |
-| `sub_task_id` | yes | Unique sub-task identifier |
-| `node_id` | yes | Proving worker identity |
-| `slice_id` | yes | Binary path in the tensor-network / idle-wire tree |
-| `output_hash` | yes | SHA3-256 of the result payload (scalar or canonical counts JSON) |
-| `terminal_statevector_digest` | optional | Links unitary terminal state to Born / trajectory claims |
-| `measurement_spec_hash` | optional | SHA3-256 of canonical measurement-spec JSON; transcript prefix `MSH1` |
+| `circuit_id` | Mandatory | SHA3-256 hash of the canonical pruned circuit specification. |
+| `sub_task_id` | Mandatory | Unique task dispatch identifier assigned by the Orchestrator. |
+| `node_id` | Mandatory | Cryptographic identifier of the worker node generating the proof. |
+| `slice_id` | Mandatory | Binary tree path designating tensor cut / idle-wire partition. |
+| `output_hash` | Mandatory | SHA3-256 hash of the computed output payload (scalar or counts JSON). |
+| `terminal_statevector_digest` | Optional | SHA3-256 digest linking unitary state vector to Born / trajectory claims. |
+| `measurement_spec_hash` | Optional | SHA3-256 digest of measurement specification (`MSH1` prefix). |
 
-Binding these fields prevents a proof from migrating across tasks or slices: the orchestrator rejects proofs whose $\mathsf{PI}$ disagrees with the dispatched announcement and returned payload.
+Formally, the mandatory public input tuple is defined as:
 
-Whitepaper notation often writes
-
-$$\mathsf{PI} = \{\,\texttt{circuit\_id},\ \texttt{sub\_task\_id},\ \texttt{node\_id},\ \texttt{slice\_id},\ \texttt{output\_result\_hash}\,\}$$
-
-with the optional digests above as Phase-C extensions for sampling and interop.
+$$\mathsf{PI} = \{\,\texttt{circuit\_id},\ \texttt{sub\_task\_id},\ \texttt{node\_id},\ \texttt{slice\_id},\ \texttt{output\_hash}\,\} \quad \text{}$$
 
 ---
 
-## 6. Unitary execution proofs
+## 6. Unitary Execution Proof Engine
 
-### 6.1 Trace geometry
+### 6.1 Trace Geometry
 
-The prover records an execution trace of width $\texttt{TRACE\_WIDTH} = 11$ floating-point columns per row:
+The unitary execution trace consists of $\texttt{TRACE\_WIDTH} = 11$ double-precision columns per row (v2 multi-target AIR):
 
-| Index | Symbol | Role |
+| Col | Field | Functional Role |
 | --- | --- | --- |
-| 0–3 | $v_0^{\mathrm{re}}, v_0^{\mathrm{im}}, v_1^{\mathrm{re}}, v_1^{\mathrm{im}}$ | Two complex amplitude registers |
-| 4 | $\texttt{gate\_id}$ | Gate opcode |
-| 5 | $\texttt{target\_qubit}$ | Target index |
-| 6–7 | $\texttt{ctrl\_active}^{(\ast)}$ | Control activation flags |
-| 8–9 | $\texttt{ctrl\_qubit}^{(\ast)}$ | Control qubit indices |
-| 10 | $\texttt{transition\_link}$ | Continuity to the next linked row |
+| 0 | $\texttt{gate\_id}$ | Numeric gate opcode (see §6.2). |
+| 1 | $\texttt{ctrl\_active}$ | Primary control activation: discrete `0.0` or `1.0` (marginal control probability thresholded at `0.5`). |
+| 2 | $\texttt{ctrl\_active\_2}$ | Secondary control for CCNOT (same discretization). |
+| 3 | $\texttt{p\_cos}$ | Rotation parameter cosine. |
+| 4 | $\texttt{p\_sin}$ | Rotation parameter sine. |
+| 5–6 | $v_0^{\mathrm{re}}, v_0^{\mathrm{im}}$ | Target-qubit $\vert{}0\rangle$ amplitude (real, imaginary). |
+| 7–8 | $v_1^{\mathrm{re}}, v_1^{\mathrm{im}}$ | Target-qubit $\vert{}1\rangle$ amplitude (real, imaginary). |
+| 9 | $\texttt{target\_qubit}$ | Logical wire index sampled in columns 5–8. |
+| 10 | $\texttt{transition\_link}$ | `1.0` if the **next** row continues the same target wire; `0.0` otherwise. |
 
-**Row pattern.** Each active gate contributes a *pre-gate* row (parameters set, amplitudes before the operator) and a *post-gate* row (`gate_id = 0`, amplitudes after). A terminal boundary row ends the segment with $\texttt{transition\_link} = 0$.
+Each gate emits **two rows** on the gate's target qubit:
 
-### 6.2 Gate alphabet
+1. **Pre-gate row** — active $\texttt{gate\_id}$; amplitudes sampled before applying the gate.
+2. **Post-gate row** — $\texttt{gate\_id} = 0$; amplitudes sampled after applying the gate (same target wire).
 
-| `gate_id` | Gate | Notes |
+After all gates, a **terminal boundary row** ($\texttt{gate\_id} = 0$) samples the last gate's target qubit with $\texttt{transition\_link} = 0$. An empty circuit emits a single terminal boundary row.
+
+`transition_link` is set after the full trace is built: pre → post for the same gate uses `link = 1`; post → next gate's pre uses `link = 1` when targets match and `link = 0` on the post row when they differ. AIR transition constraints apply only when $\texttt{transition\_link} = 1$ on the current row.
+
+Executors may **fold** consecutive unary gates before emission (e.g. even-length `H(t)^n` or net-zero `RX` runs emit no rows). Physics always applies the full gate list; folding is an AIR-encoding detail only.
+
+### 6.2 Supported Gate Alphabet
+
+| `gate_id` | Opcode | Operational Semantics |
 | --- | --- | --- |
-| 0 | NONE | Post-gate / terminal |
-| 1 | H | Hadamard |
-| 2–4 | X, Y, Z | Pauli |
-| 5–7 | RX, RY, RZ | Parameterized rotations |
-| 8–10 | CNOT, CZ, CCNOT | Controlled gates |
-| 11 | MEASURE | Trajectory branch; breaks amplitude continuity |
-| 12 | IDLE | Identity on amplitudes |
+| 0 | *(padding)* | Post-gate row or terminal boundary row. |
+| 1 | `X` | Pauli-X. |
+| 2 | `Y` | Pauli-Y. |
+| 3 | `Z` | Pauli-Z. |
+| 4 | `H` | Hadamard transformation. |
+| 5 | `S` | Phase gate. |
+| 6 | `T` | $\pi/8$ gate. |
+| 7 | `CNOT` | Controlled-NOT. |
+| 8 | `CZ` | Controlled-Z. |
+| 9 | `CCNOT` | Toffoli (CCNOT). |
+| 10–12 | `RX`, `RY`, `RZ` | Single-qubit parameterized rotations. |
 
-### 6.3 Expanded AIR and constraints
+`MEASURE`, `RESET`, and classically controlled `IF` gates do **not** appear in the unitary trace; mid-circuit measurement is handled by trajectory segmentation (§7.4).
 
-Before FRI, the prover expands the 11 columns into 21 AIR columns by adjoining one-hot gate selectors derived from `gate_id`. Constraints enforce:
+### 6.3 Expanded AIR and Constraint Algebra
 
-1. **Amplitude continuity.** When $\texttt{transition\_link} = 1$, linked registers agree across the adjoining row boundary for the same target.
-2. **Gate semantics.** Each active opcode imposes the corresponding complex-linear map on $(v_0, v_1)$ (Hadamard, Pauli / rotation action, controlled flips / phases, Toffoli, idle).
-3. **Selector consistency.** Exactly one selector is active; it matches `gate_id`.
-4. **Control consistency.** When a control flag is active, the indexed control wire participates in the gate law.
-5. **Boundary.** Terminal amplitudes match the values committed in the proof header (v1) or the reconstructed public claim (v2).
+During proof generation, each 11-column trace row is expanded into 21 AIR columns: `gate_id`, ten one-hot gate selectors, then payload columns (`ctrl_active`×2, rotation params, amplitudes×4, `target_qubit`, `transition_link`). The AIR enforces five core constraint sets:
 
-MEASURE rows deliberately waive unitary continuity: measurement is handled by the trajectory subsystem (§7).
+1. **Amplitude Continuity:** When $\texttt{transition\_link} = 1.0$, adjacent row registers sharing target wires must satisfy identity constraints.
+2. **Linear Gate Semantics:** Enforces unitary transformations over $(v_0, v_1)$, e.g., Hadamard operations enforce:
 
-### 6.4 Transcript profiles
+$$\vert{}0\rangle \mapsto \frac{\vert{}0\rangle + \vert{}1\rangle}{\sqrt{2}}, \quad \vert{}1\rangle \mapsto \frac{\vert{}0\rangle - \vert{}1\rangle}{\sqrt{2}} \quad \text{}$$
 
-**v1 (embedded).** After $\mathsf{PI}$ strings, the transcript carries `trace_rows`, $11\times\texttt{trace\_rows}$ little-endian `f64` values, an `air_sum` that must equal zero after re-expansion, and four `u32` fixed-point boundary components ($2^{30}$ scaling).
-
-**v2 (Plonky3).** After $\mathsf{PI}$, a `u32` length prefixes a postcard-encoded FRI proof. The verifier reconstructs the AIR from the same execution inputs rather than trusting an embedded float trace. Auxiliary distribution / trajectory segments may follow the unitary body.
+3. **Selector Mutex:** Validates that exactly one gate selector column is active ($1.0$) per row, matching $\texttt{gate\_id}$.
+4. **Control and Rotation Payload:** Validates $\texttt{ctrl\_active}$ / $\texttt{ctrl\_active\_2}$ discretization and rotation parameters ($\texttt{p\_cos}$, $\texttt{p\_sin}$) for controlled and parameterized gates.
+5. **Boundary Identity:** Verifies that terminal row amplitudes match committed boundary values within $2^{30}$ fixed-point precision ($\texttt{FIXED\_POINT\_SCALE} = 10{,}000$).
 
 ---
 
-## 7. Distribution and trajectory binding
+## 7. Distribution and Trajectory Subsystems
 
-For `sample_counts`, correctness means more than “some unitary ran.” The client’s histogram must be the *unique* deterministic consequence of (i) the proved state (or proved trajectory), (ii) a 64-bit `sample_seed` **deterministically derived from the task specification** (orchestrator-assigned; not client-supplied), and (iii) the measurement specification.
+### 7.1 Deterministic Sampling Pipeline
 
-### 7.1 Sampling pipeline
+For `sample_counts` tasks, sample output histograms are validated by binding execution to a deterministic sampling pipeline:
 
 ```
 Unitary STARK
@@ -229,46 +233,33 @@ Unitary STARK
 
 ```
 
-### 7.2 Algebraic distribution binding
+### 7.2 Probability Table Commitment
 
-A distribution segment commits to seed, shots, `measurement_spec_hash`, a probability digest, and the explicit probability table (or its streamable surrogate). The verifier recomputes counts from those commitments and checks `output_hash`.
+Distribution segments commit directly to `sample_seed`, target shot counts, `measurement_spec_hash`, a 32-byte `probability_digest`, and the explicit probability table.
 
-**`probability_digest` construction.** SHA3-256 over the concatenated little-endian `f64` probability bytes (terminal Born table of length $2^n$), or—for trajectory algebraic binding—over the concatenated per-event marginal probability bytes. The digest is stored as 32 raw bytes in the segment.
+The `probability_digest` is constructed as:
 
-Two encodings exist:
+$$\texttt{probability\_digest} = \mathrm{SHA3\text{-}256}\left( \mathop{\parallel}_{i=0}^{2^n-1} \mathrm{LE\_f64}(P_i) \right)$$
 
-* **v1 (`_M31_DIST_V1_`)** — legacy: seed, shots, digest, dense `f64` probabilities.
-* **v2 (`_M31_DIST_V2_`)** — adds ASCII `measurement_spec_hash` and an optional Born zk tail.
+### 7.3 Born Zero-Knowledge Proofs (`DistributionAir`)
 
-### 7.3 Born zero-knowledge (`DistributionAir`)
+`DistributionAir` constructs a streaming row trace over basis outcomes. Constraints enforce probability normalization ($\sum P_i = 1$), fixed-point conversion bounds, digest matching, and link consistency with the unitary execution proof. Soft limits cap streaming Born zk proofs to 16 qubits and 64 active table outcomes.
 
-A streaming AIR places one row per basis outcome, avoiding an exponential column blow-up. Constraints insist on fixed-point probabilities, normalization (sum $= 1$ within rounding), digest binding, and—when composed as `leaf:unitary_born`—consistency with the unitary link digest. Soft caps currently allow algebraic / Plonky3 Born zk up to **16 qubits** and **64** distinct outcomes in the zk table.
+### 7.4 Mid-Circuit Trajectory Proofs
 
-### 7.4 Mid-circuit trajectories
+Non-unitary dynamic circuits split execution into state trajectory segments containing ordered measurement events:
 
-Dynamic circuits detach a *trajectory segment* from the unitary body:
+$$\text{Event}_k = \left\{ \text{qubit}_k,\, \text{outcome}_k,\, \text{state\_digest}_k,\, p_0,\, p_1 \right\} \quad \text{}$$
 
-```
-<_M31_TRAJ_V1_|_M31_TRAJ_V2_>
-event_count;
-for each event: measured_qubit, outcome, pre_measure_state_digest, p0, p1;
-[optional _M31_TRAJ_STARK_V1_]
-
-```
-
-v2 optionally prefixes a `unitary_link_digest` that chains the pre-first-measure state to the unitary STARK. Trajectory zk proves each unique pre-measure Z-marginal and may attach a per-shot Bernoulli AIR: the host replays $\texttt{StdRng}(\texttt{shot\_seed})$ to supply $u\sim U[0,1)$; the AIR proves the fixed-point comparison $\texttt{outcome}=1 \Leftrightarrow u \ge p_0$ via gap-bit decomposition. Caps: trajectory marginal zk ≤ **16 qubits**; ≤ **2048** sampling events per shot path.
-
-### 7.5 Strength without zk AIRs
-
-When zk AIRs are disabled, algebraic segments alone still bind seed and probabilities to the output hash. That is strictly weaker (a prover could lie about Born physics while keeping a consistent table), but remains useful when the dense table is already implied by a fully verified unitary terminal digest in lighter deployments.
+Trajectory zk extensions evaluate Z-basis marginals per event and enforce $u \sim U[0, 1)$ Bernoulli draws driven by $\texttt{StdRng}(\texttt{shot\_seed})$ via gap-bit decomposition AIRs. Caps enforce $\le 16$ qubits for trajectory marginals and $\le 2048$ measurement events per path.
 
 ---
 
-## 8. Composition and aggregation
+## 8. Composition, Aggregation, and Recursive Verification
 
-### 8.1 Binary compose (v3)
+### 8.1 Binary Composition Structure (v3)
 
-Aggregation proceeds as a binary tree of compose nodes:
+Multi-slice proofs are structured into a binary tree using v3 composition containers:
 
 ```
 parent_task_id\0
@@ -281,133 +272,167 @@ left_len; left_bytes; right_len; right_bytes;
 
 ```
 
-The verifier checks $\texttt{SHA3-256}(\texttt{child\_bytes})=\texttt{child\_hash}$ and dispatches child verification by label / marker. Normative wire layout: Appendix B.3.
+Verifiers assert $\mathrm{SHA3\text{-}256}(\mathrm{child\_bytes}) == \mathrm{child\_hash}$ prior to dispatching child verification. Canonical leaf labels structure child dependencies:
 
-**Canonical leaf labels.**
-
-| Label | Left | Right |
+| Composition Label | Left Child Target | Right Child Target |
 | --- | --- | --- |
-| `leaf:unitary_born` | v2 unitary (+ optional MSH / terminal digest) | Born leaf `_M31_BORN_LEAF_V1_` |
-| `leaf:unitary_traj` | v2 unitary (+ link digest) | Trajectory leaf `_M31_TRAJ_LEAF_V1_` |
+| `leaf:unitary_born` | Unitary STARK v2 + digests. | Born Leaf (`_M31_BORN_LEAF_V1_`). |
+| `leaf:unitary_traj` | Unitary STARK v2 + link digest. | Trajectory Leaf (`_M31_TRAJ_LEAF_V1_`). |
 
-Inner nodes combine verified slice winners toward the task root. Compose-time checks ensure the unitary child’s `terminal_statevector_digest` (and, when present, `measurement_spec_hash`) match the values bound in the distribution / trajectory child.
+### 8.2 Aggregation Modes and Soundness
 
-### 8.2 Aggregation protocols and soundness modes
-
-Composition supports three verification paradigms depending on the required trade-off between prover work and verifier succinctness:
-
-| Mode | Mechanism | Verification Cost | Guarantees |
+| Aggregation Mode | Protocol Mechanism | Verifier Complexity | Soundness & Verification Bounds |
 | --- | --- | --- | --- |
-| **Direct Walk** | v3 tree binary traversal | $\mathcal{O}(N)$ leaf STARKs | Re-evaluates every child leaf natively. |
-| **Digest Attestation** | `AggregationAir` (v4) | $\mathcal{O}(1)$ Aggregation STARK | Constrains container digests and host verification flags in-circuit. |
-| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) | $\mathcal{O}(1)$ Root STARK | Complete in-circuit verification via PCS certificates and out-of-domain (OOD) checks. |
+| **Direct Walk** | Structural binary traversal of v3 tree. | $\mathcal{O}(N)$ | Evaluates every child leaf natively. |
+| **Digest Attestation** | `AggregationAir` (v4) tail. | $\mathcal{O}(1)$ | Asserts child digest integrity and host flags in-circuit. |
+| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) tail. | $\mathcal{O}(1)$ | Complete in-circuit verification via PCS certificates and OOD checks. |
 
 #### RecursiveAggregationAir (v6 Architecture)
 
-The primary recursive engine (`RecursiveAggregationAir`, width 330) binds child STARK digests alongside in-circuit polynomial commitment scheme (PCS) proofs. For each side of a compose node, a side flag indicates the verification bundle:
+The v6 recursive engine operates over an AIR width of 330. It validates left and right child proofs via side flags:
 
-* `0`: Legacy compose without PCS bundle.
-* `1`: `AggPcsCertificate` (for child aggregation nodes).
-* `2`: `LeafPcsBundle` (for leaf nodes: unitary, Born, or trajectory).
+* `0`: Legacy composition (no PCS bundle).
+* `1`: `AggPcsCertificate` (child aggregation node).
+* `2`: `LeafPcsBundle` (leaf node: unitary, Born, or trajectory).
 
-Each certificate contains Merkle/Keccak sponge commitments, query-wise FriFold evaluations, DeepRo trace bindings, in-circuit FRI Validation/Challenge Mmcs proofs, and in-circuit `OodCheckAir` constraints covering both aggregation and leaf AIR types.
+Certificates embed Merkle/Keccak commitments, FriFold evaluations, DeepRo trace bindings, in-circuit FRI Validation/Challenge Mmcs proofs, and `OodCheckAir` constraints.
 
-### 8.3 Leaf PCS integration and operational considerations
+### 8.3 Leaf PCS Workflow and Delivery Architecture
 
 #### Leaf PCS Bundles
 
-When a child node is a leaf (`kind=leaf`), `RecursiveAggregationAir` (v6) attaches a `LeafPcsBundle` corresponding to its domain:
+Leaf nodes attach specialized PCS bundles matching their computational domain:
 
-| Leaf Type | Bundle Composition |
+| Leaf Domain | LeafPcsBundle Composition |
 | --- | --- |
-| **Unitary** | 1 $\times$ `LeafPcsCertificate` (`QuantumExecutionAir` OOD) |
-| **Born** | 1 $\times$ `LeafPcsCertificate` (`DistributionAir` OOD) |
-| **Trajectory** | $N \times$ Marginal Certificates + 1 $\times$ Shot Sampling Certificate |
+| **Unitary** | $1 \times$ `LeafPcsCertificate` (`QuantumExecutionAir` OOD). |
+| **Born** | $1 \times$ `LeafPcsCertificate` (`DistributionAir` OOD). |
+| **Trajectory** | $N \times$ Marginal Certificates $+ 1 \times$ Shot Sampling Certificate. |
 
-Statement columns in `RecursiveAggregationAir` reflect the leaf bundle:
+#### P2P Delivery Protocol
 
-* `trace_commitment`: Set to the first certificate's commitment hash.
-* `natural_row` (cols 0–32): Stores $\mathrm{SHA3}(\mathrm{concat}(\text{cert.stmt\_digest}))$ mapped as Mersenne31 field elements.
-* `pcs_ok`: Evaluates to 1 when the polynomial commitment constraints hold in-circuit.
+To keep PCS generation off the critical path, proof creation is delegated to a single quorum majority worker node at a time:
 
-At verification time, out-of-domain quotient checks and leaf constraint evaluations execute in-circuit through `OodCheckAir`. Born recursion supports outcome dimensions up to $K \le 21$ (AIR width $W = 2 + 3K + 1 \le 68$) to fit within two Keccak rate blocks.
+```
+Orchestrator ─── /wqc/tensor-pcs-req/1.0.0 ───► Candidate Worker Node
+                     │
+                     │  (internal) POST /leaf_pcs ──► wqc-core
+                     │  (internal) bundle or HTTP 422 ◄── wqc-core
+                     │
+Orchestrator ◄─── /wqc/tensor-pcs/1.0.0 ────── Candidate Worker Node
+                     { leaf_pcs_b64 }  or  { refused: true, refuse_reason }
 
-#### Footprint and Resource Bounds
+```
 
-While `RecursiveAggregationAir` achieves $\mathcal{O}(1)$ verification cost at the root, the inclusion of all-query FRI proofs and in-circuit Keccak sponges (`ValMmcs`/`ChallengeMmcs`) increases proof artifact size. In production execution profiles:
+1. **Request Dispatch:** At quorum, the orchestrator records the quorum majority node list and transmits an Ed25519-signed request containing `sub_task_id` and `node_id` over `/wqc/tensor-pcs-req/1.0.0` to the first slice proof winner.
+2. **Candidate Build & Response:** The nominated node calls core `POST /leaf_pcs` with its retained leaf STARK proof. On success, core returns the encoded `LeafPcsBundle`; the node streams it to the orchestrator on `/wqc/tensor-pcs/1.0.0` as `leaf_pcs_b64`. If the PCS memory gate refuses (core HTTP 422, `PCS memory: ... (policy=refuse)`), the node permanently reports `refused: true` on `/wqc/tensor-pcs/1.0.0` (no retry). Only the currently nominated node may submit PCS for a slice.
+3. **Failover & Compensation:** Upon refusal, the orchestrator records the refusing node, updates the slice proof winner (`StoreFinalSliceProof`) to the next quorum majority candidate that still holds a valid pending proof, and re-sends `/wqc/tensor-pcs-req/1.0.0` to that node. Storing a valid bundle compensates the successful candidate with $R_{\mathrm{pcs}}$ (40% of the slice fee).
+4. **Finalization & Fallback:** Compose waits until PCS is **satisfied** — a bundle is stored, or all quorum majority candidates are exhausted (`Exhausted` marker). While alternates remain, partial refusals do not trigger fallback. If no bundle arrives and candidates are not yet exhausted, the orchestrator waits up to `WQC_PCS_TIMEOUT_SECS` (default 7200s), then triggers a local fallback build (`build_leaf_pcs_bundle_from_child`), leaving $R_{\mathrm{pcs}}$ unpaid.
 
-* Two idle unitary leaf proofs generate a composed root artifact of approximately **1.09 GiB**.
-* Each leaf PCS side contributes approximately **587 MiB** to the total payload.
+#### Artifact Footprint Analysis
 
-Consequently, recursive composition is cryptographically complete for active network topologies, while payload compression and query batching represent key operational priorities for deployment.
+Default deployment profiles set `WQC_PCS_MMCS_GROUP_CHUNK` to **24** (Mmcs group batch size; smaller values reduce peak RAM at the cost of larger wire payloads):
 
----
-
-## 9. Soft caps and operational bounds
-
-For the present **noiseless** `sample_counts` regime:
-
-| Bound | Value |
+| Proof Artifact Type | Typical Binary Footprint |
 | --- | --- |
-| Algebraic Born / marginal qubits | 16 |
-| Plonky3 Born zk qubits | 16 |
-| Born zk outcomes | 64 |
-| Born recursion outcomes ($K$; RecAgg leaf PCS) | 21 ($W\le 68$) |
-| Trajectory marginal zk qubits | 16 |
-| Per-shot sampling events | 2048 |
+| Single Leaf PCS Certificate | $\approx \text{5 MiB}$ |
+| Encoded `LeafPcsBundle` | $\approx \text{6 MiB}$ |
+| Two-Leaf Composed Root Artifact | $\approx \text{16 MiB}$ |
 
-These caps are soft engineering limits of the current AIRs and streaming layouts; they are not intrinsic STARK barriers. Separate orchestrator / core policies (e.g. classical bit-width and mid-circuit qubit ceilings for dense simulation) further constrain what can be submitted; those client-facing limits belong in the public API documentation and are outside the algebraic scope of this paper.
+### 8.4 PCS Memory Gating Policy
 
-Noise models (`depolarizing_p`, `readout_error`) may alter trajectory simulation for demos; they are **not** presently STARK-bound.
+To prevent Out-Of-Memory (OOM) failures during the blowup-16 Keccak Mmcs phase, core evaluates peak RAM usage prior to leaf/aggregation PCS prove when `WQC_MAX_MEMORY_GB` is set. When unset, the memory gate is **disabled** (no refuse/spill enforcement).
 
----
+When the gate is active and estimated RAM exceeds the budget, `WQC_PCS_MEMORY_POLICY` governs execution:
 
-## 10. End-to-end verification protocol
+| Environment Variable | Default | Role |
+| --- | --- | --- |
+| `WQC_MAX_MEMORY_GB` | *(unset)* | Enables the PCS memory gate when set; unset disables gating. |
+| `WQC_PCS_MEMORY_POLICY` | `refuse` | `refuse` (fail prove) or `spill` (auto-lower Mmcs chunk). |
+| `WQC_PCS_MMCS_GROUP_CHUNK` | `24` | Mmcs group chunk size for leaf/agg PCS prove (time vs wire trade-off). |
+| `WQC_PCS_MEMORY_ESTIMATE_SCALE` | *(unset)* | Optional multiplier on the peak-RAM estimate. |
 
-1. **Marker detection.** Identify v1 / v2 / v3 (and reject the legacy `_M31_QUANTUM_AIR_STARK_` marker).
-2. **Public-input check.** Compare $\mathsf{PI}$ against redispatched metadata and the result payload hash.
-3. **Core proof check.**
-* v1: re-expand trace; require `air_sum = 0` and matching boundaries.
-* v2: verify FRI; process auxiliary segments in marker order.
-* v3: hash-check children; verify children (and `AggregationAir` if present).
-
-4. **Sampling check.** For counts tasks, recompute the deterministic sampling chain and compare `output_hash`.
-5. **Root seal.** Persist `proof_root_hash` and the root artifact for clients and (eventually) L2 settlement.
-
-A proof that fails any stage fails the task: workers are not paid for invalid or substituted work.
+* **`refuse` (Default):** Terminates bundle generation with a stable error (`PCS memory: ... (policy=refuse)`), returning HTTP 422 from core. The node maps this to P2P `refused: true`; the orchestrator tries the next quorum majority node or, when exhausted, compose fallback.
+* **`spill`:** Decrements the active Mmcs group chunk size (via session override of `WQC_PCS_MMCS_GROUP_CHUNK`) toward 1 until estimated memory falls within budget. If memory still exceeds budget at chunk size 1, the engine defaults to `refuse`.
 
 ---
 
-## 11. Discussion and future work
+## 9. Soft Operational Bounds
 
-**Strengths.** The pipeline realizes the essential asymmetric shape of D-PoUW: proving cost tracks useful quantum simulation (wide memory, NTTs, FRI), while orchestrators verify leaves and—via v4/v6 aggregation—roots cheaply. Transparency removes coordination ceremonies that would be untenable across a global volunteer swarm. Polymorphic outputs, including mid-circuit trajectories, bring the proof surface close to algorithms practitioners actually run (VQE sampling, dynamic QEC primitives, variational loops).
+Operational caps for the noiseless simulation regime are defined as follows:
 
-**Open challenges.**
+| Parameter Constraint | Soft Limit Value |
+| --- | --- |
+| Maximum Algebraic Born / Marginal Qubits | 16 qubits |
+| Maximum Plonky3 Born zk Qubits | 16 qubits |
+| Maximum Born zk Active Table Outcomes | 64 outcomes |
+| Maximum Born Recursion Outcomes ($K$; RecAgg) | $K \le 21$ ($W \le 68$) |
+| Maximum Trajectory Marginal zk Qubits | 16 qubits |
+| Maximum Per-Shot Trajectory Events | 2048 events |
 
-1. **Proof Size and Memory Footprint.** Embeddings of all-query `ValMmcs` / `ChallengeMmcs` Keccak STARKs per leaf side increase root artifact size in v6 composition trees. Future revisions will explore payload compression, opening-proof batching, and alternative authenticated opening schemes to reduce memory consumption.
-2. **Recursive Protocol Refinement.** Continuation of witness extraction optimizations, native multi-chunk leaf DeepRo structures, and ongoing integration across multi-slice execution topologies.
-3. **Larger Born / Trajectory Zero-Knowledge.** Soft caps of 16 qubits bound the fully zk-sampled subspace; larger histograms currently rely on algebraic binding and unitary compressions (TN cut, idle wires).
-4. **Noise-Aware STARKs.** Stochastic physical channels (e.g., depolarization, readout noise) remain outside the current constraint model.
-5. **Machine-Readable API.** Formalization of error codes and parameter definitions within user-facing interfaces to simplify error handling on failed submissions.
-
-**Related vision.** As aggregation deepens, Layer-2 contracts need verify only $\pi_{\mathrm{Root}}$, with verification cost scaling as $\mathcal{O}(\log^2 M)$ in proof-tree depth once recursion is complete—completing the transition from fortress supercomputers to a cryptographically accountable swarm.
-
----
-
-## Acknowledgments
-
-This specification reflects the WQC proof stack as implemented in `wqc-stark-engine`, consumed by `wqc-core` / `wqc-node`, and verified by `wqc-orchestrator`. Design lineage includes Plonky3 (Polygon) and the STARK literature on FRI and AIR.
+Note: These constraints represent software engineering boundaries for current streaming AIR layouts and do not reflect fundamental cryptographic limits of the underlying zk-STARK protocol.
 
 ---
 
-## Appendix A. Transcript markers
+## 10. End-to-End Verification Algorithm
 
-| Constant | Marker string |
+A verifier executes the following deterministic validation pipeline upon receiving a proof artifact:
+
+```
+  ┌─────────────────────────────────────────────────────────┐
+  │ Step 1: Marker Detection & Protocol Routing             │
+  └────────────────────────────┬────────────────────────────┘
+                               │
+  ┌────────────────────────────▼────────────────────────────┐
+  │ Step 2: Public Input (PI) Context Validation            │
+  └────────────────────────────┬────────────────────────────┘
+                               │
+  ┌────────────────────────────▼────────────────────────────┐
+  │ Step 3: Core STARK & Verification (v1/v2/v3 Traversal)  │
+  └────────────────────────────┬────────────────────────────┘
+                               │
+  ┌────────────────────────────▼────────────────────────────┐
+  │ Step 4: Sampling PRNG & Hash Determinism Check          │
+  └────────────────────────────┬────────────────────────────┘
+                               │
+  ┌────────────────────────────▼────────────────────────────┐
+  │ Step 5: Root Seal Registration & Digest Ledger Commit   │
+  └─────────────────────────────────────────────────────────┘
+
+```
+
+1. **Marker Detection:** Reads protocol header markers (`_M31_QUANTUM_AIR_V1_`, `_M31_PLONKY3_STARK_V2_`, `_WQC_COMPOSE_V3_`), rejecting legacy or invalid markers.
+2. **Public Input Context Binding:** Asserts equality between proof context $\mathsf{PI}$ and dispatch parameters (`circuit_id`, `sub_task_id`, `node_id`, `slice_id`, `output_hash`).
+3. **Core STARK Verification:**
+* *v1:* Re-expands execution trace, verifying $\texttt{air\_sum} == 0$ and matching boundary fixed-point constraints.
+* *v2:* Reconstructs AIR from execution parameters, validating FRI proofs over Circle PCS alongside attached auxiliary segments.
+* *v3:* Evaluates binary tree child hashes and recursively verifies child STARKs (and `AggregationAir` tails if present).
+4. **Sampling Determinism Check:** Re-runs deterministic PRNG sampling over committed probability tables, asserting that calculated counts reproduce `output_hash`.
+5. **Root Verification & Settlement:** Seals `proof_root_hash` and commits `root.bin` artifacts for network consensus settlement.
+
+---
+
+## 11. Discussion and Future Work
+
+The WQC proof engine implements a scalable D-PoUW framework. By shifting proving overhead—including wide-memory state vector evolution, Number Theoretic Transforms (NTTs), and FRI commitments—to worker nodes, verification costs remain polylogarithmic.
+
+Key research and optimization priorities include:
+
+1. **Proof Footprint Reduction:** Shrinking recursive proof artifacts (currently $\approx 16\text{ MiB}$ for two-leaf composed roots) via Poseidon2 recursion-friendly hashes within Mmcs folding circuits.
+2. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction, expanding multi-chunk leaf DeepRo structures, and enabling runtime FRI query adjustments mapped to security parameters.
+3. **Extended Zero-Knowledge Limits:** Expanding Born and trajectory zero-knowledge AIR capacity beyond current 16-qubit streaming bounds.
+4. **Noise-Aware STARK Constraints:** Formally incorporating stochastic physical noise models (e.g., depolarizing channels and readout error operators) directly into the transition AIR.
+
+---
+
+## Appendix A. Protocol Transcript Markers
+
+| Identifier Constant | Marker Byte String |
 | --- | --- |
 | `V1_MARKER` | `_M31_QUANTUM_AIR_V1_` |
 | `V2_MARKER` | `_M31_PLONKY3_STARK_V2_` |
 | `V3_COMPOSE_MARKER` | `_WQC_COMPOSE_V3_` |
-| `LEGACY_MARKER` | `_M31_QUANTUM_AIR_STARK_` (rejected) |
+| `LEGACY_MARKER` | `_M31_QUANTUM_AIR_STARK_` *(Rejected)* |
 | `BORN_LEAF_MARKER` | `_M31_BORN_LEAF_V1_` |
 | `TRAJ_LEAF_MARKER` | `_M31_TRAJ_LEAF_V1_` |
 | `DIST_MARKER_V1` / `V2` | `_M31_DIST_V1_` / `_M31_DIST_V2_` |
@@ -415,18 +440,20 @@ This specification reflects the WQC proof stack as implemented in `wqc-stark-eng
 | `TRAJ_MARKER` | `_M31_TRAJ_V1_` / `_M31_TRAJ_V2_` |
 | `TRAJ_STARK_MARKER` | `_M31_TRAJ_STARK_V1_` |
 | `AGG_TAIL_MARKER` | `_WQC_AGG_TAIL_V4_` |
-| Aggregation body | `_WQC_AGG_STARK_V4_` |
-| `REC_TAIL_MARKER` | `_WQC_REC_TAIL_V5_` (legacy) / `_WQC_REC_TAIL_V6_` |
-| Recursive aggregation body | `_WQC_REC_AGG_V5_` / `_WQC_REC_AGG_V6_` |
-| Measurement-spec prefix | `MSH1` |
+| `V4_AGG_INNER_MARKER` | `_WQC_AGG_STARK_V4_` |
+| `REC_TAIL_MARKER` (v6) | `_WQC_REC_TAIL_V6_` |
+| `V6_REC_AGG_INNER_MARKER` | `_WQC_REC_AGG_V6_` |
+| `REC_TAIL_MARKER` (v5, legacy) | `_WQC_REC_TAIL_V5_` |
+| `V5_REC_AGG_INNER_MARKER` | `_WQC_REC_AGG_V5_` |
+| Measurement Spec Prefix | `MSH1` |
 
 ---
 
-## Appendix B. Binary layouts (normative)
+## Appendix B. Normative Binary Wire Layouts
 
-All string fields are NUL-terminated C strings. Multibyte integers are little-endian unless stated otherwise. Hex digests are 64 ASCII hex characters (SHA3-256). Fixed-point values use $2^{30}$ scaling rounded to `u32` least-significant bits.
+All string fields are NUL-terminated UTF-8 sequence bytes. Multi-byte integers are encoded in Little-Endian (LE) format.
 
-### B.1 v1 unitary (embedded trace)
+### B.1 v1 Unitary Proof Format (Embedded Trace)
 
 ```
 <sub_task_id\0>
@@ -435,18 +462,14 @@ All string fields are NUL-terminated C strings. Multibyte integers are little-en
 [optional terminal_statevector_digest\0]
 [optional MSH1<measurement_spec_hash>\0]
 <trace_rows: u32 LE>
-<trace: f64 LE repeated trace_rows × 11>
+<trace: f64 LE array of size (trace_rows × 11)>
 <air_sum: u32 LE>
-<boundary_v0_re: u32 LE>
-<boundary_v0_im: u32 LE>
-<boundary_v1_re: u32 LE>
-<boundary_v1_im: u32 LE>
+<boundary_v0_re: u32 LE><boundary_v0_im: u32 LE>
+<boundary_v1_re: u32 LE><boundary_v1_im: u32 LE>
 
 ```
 
-`trace_rows` counts the total number of trace rows (pre-gate + post-gate pairs plus terminal). The verifier re-expands the 11 f64 columns to 21 AIR columns (see Appendix C) and recomputes the constraint sum; a valid proof has `air_sum == 0`. The four boundary values encode the real and imaginary parts of the two amplitude registers (`v0`, `v1`) from the final trace row, scaled by $2^{30}$ and rounded to `u32`.
-
-### B.2 v2 unitary (Plonky3 FRI STARK)
+### B.2 v2 Unitary Proof Format (Plonky3 STARK)
 
 ```
 <sub_task_id\0>
@@ -459,21 +482,7 @@ All string fields are NUL-terminated C strings. Multibyte integers are little-en
 
 ```
 
-After the unitary proof body, zero or more auxiliary segments may follow (detected by their markers):
-
-| Segment | Marker | Payload |
-| --- | --- | --- |
-| Distribution v1 | `_M31_DIST_V1_` | B.4 |
-| Distribution v2 | `_M31_DIST_V2_` | B.4 |
-| Trajectory v1 / v2 | `_M31_TRAJ_V1_` / `_M31_TRAJ_V2_` | B.5 |
-| Born zk tail | `_M31_BORN_TAIL_V1_` | (inner distribution STARK, wrapped inside distribution segment) |
-| Trajectory zk tail | `_M31_TRAJ_STARK_V1_` | (inner marginal / shot-sampling STARK, wrapped inside trajectory segment) |
-| Aggregation v4 | `_WQC_AGG_TAIL_V4_` | B.6 |
-| Recursive Aggregation v6 | `_WQC_REC_TAIL_V6_` | B.7 |
-
-The v2 verifier reconstructs the AIR trace from the same execution inputs (not embedded) and evaluates constraints over the trace extension. Auxiliary segments are processed in marker order.
-
-### B.3 v3 compose
+### B.3 v3 Binary Composition Container
 
 ```
 <parent_task_id\0>
@@ -482,76 +491,42 @@ The v2 verifier reconstructs the AIR trace from the same execution inputs (not e
 <manifest_root_hash\0>
 <left_child_hash: 32 bytes>
 <right_child_hash: 32 bytes>
-<left_len: u32 LE>
-<left_child: left_len bytes>
-<right_len: u32 LE>
-<right_child: right_len bytes>
-[optional v4 aggregation tail (see B.6)]
-[optional v6 recursive aggregation tail (see B.7)]
+<left_len: u32 LE><left_child: left_len bytes>
+<right_len: u32 LE><right_child: right_len bytes>
+[optional _WQC_AGG_TAIL_V4_ tail]
+[optional _WQC_REC_TAIL_V6_ tail]
 
 ```
 
-Child hashes are SHA3-256 of the corresponding child bytes. The verifier checks `SHA3-256(left_child) == left_child_hash` (and symmetrically for right) before routing to the appropriate child verifier.
-
-Compose labels:
-
-| Label | Left child | Right child |
-| --- | --- | --- |
-| `leaf:unitary_born` | v2 unitary (+ optional MSH / terminal digest) | Born leaf (`_M31_BORN_LEAF_V1_`) |
-| `leaf:unitary_traj` | v2 unitary (+ link digest) | Trajectory leaf (`_M31_TRAJ_LEAF_V1_`) |
-| *(task / slice tree)* | Verified slice winner | Verified slice winner |
-
-### B.4 Distribution segment
-
-Appended after the unitary proof body for `sample_counts` outputs.
-
-**v1 (legacy):**
-
-```
-<_M31_DIST_V1_>
-<seed: u64 LE>
-<shots: u32 LE>
-<probability_digest: 32 bytes (SHA3-256)>
-<probabilities: f64 LE × 2ⁿ>
-
-```
-
-**v2:**
+### B.4 Distribution Segment Format (v2)
 
 ```
 <_M31_DIST_V2_>
 <seed: u64 LE>
 <shots: u32 LE>
 <measurement_spec_hash: 64 ASCII hex chars>
-<probability_digest: 32 bytes (SHA3-256)>
-<probabilities: f64 LE × 2ⁿ>
+<probability_digest: 32 bytes SHA3-256>
+<probabilities: f64 LE array of size 2ⁿ>
 [optional _M31_BORN_TAIL_V1_ tail]
 
 ```
 
-`seed` is the task’s deterministically derived `sample_seed` (§7). `probability_digest` is SHA3-256 of the concatenated LE `f64` probability bytes (§7.2). The Born zk tail (when present) contains an inner Plonky3 STARK over `DistributionAir` (see §7.3).
-
-### B.5 Trajectory segment
-
-Appended after the unitary proof body for mid-circuit measurement outputs.
+### B.5 Trajectory Segment Format (v2)
 
 ```
-<_M31_TRAJ_V1_> or <_M31_TRAJ_V2_>
-[optional unitary_link_digest: 64 ASCII hex chars\0]   (v2 only)
+<_M31_TRAJ_V2_>
+[optional unitary_link_digest: 64 ASCII hex chars\0]
 <event_count: u32 LE>
 for each event:
   <measured_qubit: u32 LE>
   <outcome: u32 LE>
   <pre_measure_state_digest: 32 bytes>
-  <p0: u32 LE fixed-point>
-  <p1: u32 LE fixed-point>
+  <p0: u32 LE fixed-point><p1: u32 LE fixed-point>
 [optional _M31_TRAJ_STARK_V1_ tail]
 
 ```
 
-`unitary_link_digest` chains the pre-first-measure unitary state to the trajectory body. The zk tail contains marginal STARK proofs for each unique pre-measure Z-marginal, plus an optional per-shot Bernoulli sampling STARK (see §7.4).
-
-### B.6 Aggregation tail (v4)
+### B.6 Aggregation Tail Format (v4)
 
 ```
 <_WQC_AGG_TAIL_V4_>
@@ -559,18 +534,13 @@ for each event:
 <_WQC_AGG_STARK_V4_>
 <compose_label\0>
 <manifest_root_hash\0>
-<left_hash: 32 bytes>
-<right_hash: 32 bytes>
+<left_hash: 32 bytes><right_hash: 32 bytes>
 <proof_len: u32 LE>
 <proof: postcard-encoded p3_uni_stark::Proof>
 
 ```
 
-The `AggregationAir` uses the same Circle PCS / Plonky3 uni-STARK configuration as unitary leaf proofs. It binds left and right child SHA3-256 digests directly in the trace and constrains both child verification flags to 1. Child STARK verification is performed natively at compose time, not in-circuit; the aggregation STARK attests digest binding and compose metadata only.
-
-### B.7 Recursive aggregation STARK (v6)
-
-Appended after the v3 compose body and the V4 `AggregationAir` tail:
+### B.7 Recursive Aggregation STARK Format (v6)
 
 ```
 <_WQC_REC_TAIL_V6_>
@@ -579,100 +549,55 @@ Appended after the v3 compose body and the V4 `AggregationAir` tail:
   <_WQC_REC_AGG_V6_>
   <compose_label\0>
   <manifest_root_hash\0>
-  <left_hash: 32><right_hash: 32>
-  <left_stark_digest: 32><right_stark_digest: 32>
+  <left_hash: 32 bytes><right_hash: 32 bytes>
+  <left_stark_digest: 32 bytes><right_stark_digest: 32 bytes>
   <left_kind: u8><right_kind: u8>
-  <left_side?> <right_side?>   # Per side: 0=none, 1=AggPcsCertificate, 2=LeafPcsBundle
-                                 # Certificate payload: MerkleFold + Keccak + FriFold + DeepRo
-                                 #                      + FRI Val/Challenge Mmcs + OodCheckAir
+  <left_side_bundle> <right_side_bundle>
   <proof_len: u32 LE>
   <proof: postcard-encoded RecursiveAggregationAir>
 
 ```
 
-`RecursiveAggregationAir` (width 330) binds child STARK digests and, for each side, either an `AggregationAir` natural row + PCS commitment (`AggPcsCertificate`) or a leaf PCS statement digest derived from the leaf bundle (`LeafPcsBundle`: unitary / Born / trajectory). Each certificate carries Merkle/Keccak sponges, all-query FriFold, DeepRo, in-circuit FRI Val/Challenge Mmcs, and in-circuit `OodCheckAir`.
+---
+
+## Appendix C. Execution Trace AIR Reference
+
+### C.1 Primary Execution Trace Columns
+
+| Column Index | Field Name | Description |
+| --- | --- | --- |
+| 0 | `gate_id` | Operation opcode (§6.2). |
+| 1 | `ctrl_active` | Primary control activation (`0.0` or `1.0`). |
+| 2 | `ctrl_active_2` | Secondary control for CCNOT. |
+| 3 | `p_cos` | Rotation parameter cosine. |
+| 4 | `p_sin` | Rotation parameter sine. |
+| 5 | `v0_re` | Target-qubit $\vert{}0\rangle$ amplitude (real). |
+| 6 | `v0_im` | Target-qubit $\vert{}0\rangle$ amplitude (imaginary). |
+| 7 | `v1_re` | Target-qubit $\vert{}1\rangle$ amplitude (real). |
+| 8 | `v1_im` | Target-qubit $\vert{}1\rangle$ amplitude (imaginary). |
+| 9 | `target_qubit` | Logical wire index for columns 5–8. |
+| 10 | `transition_link` | `1.0` if the next row continues the same target wire. |
+
+### C.2 Expanded AIR Column Layout
+
+`wqc-stark-core` expands each 11-column trace row into $\texttt{AIR\_WIDTH} = 21$ columns:
+
+| AIR Col | Source | Description |
+| --- | --- | --- |
+| 0 | trace col 0 | `gate_id` |
+| 1–10 | `gate_id` expansion | One-hot selectors (`X`, `Y`, `Z`, `H`, `S`, `T`, `CNOT`, `CZ`, `CCNOT`, `ROT`) |
+| 11–12 | trace cols 1–2 | `ctrl_active`, `ctrl_active_2` |
+| 13–14 | trace cols 3–4 | `p_cos`, `p_sin` |
+| 15–18 | trace cols 5–8 | `v0_re`, `v0_im`, `v1_re`, `v1_im` |
+| 19 | trace col 9 | `target_qubit` |
+| 20 | trace col 10 | `transition_link` |
+
+Selector index for gate id $g$: $1..=6 \to g-1$; CNOT ($7$) $\to 6$; CZ ($8$) $\to 7$; CCNOT ($9$) $\to 8$; RX/RY/RZ ($10..=12$) $\to 9$. Padding ($g = 0$) activates no selector.
 
 ---
 
-## Appendix C. AIR column reference
+## References
 
-### C.1 Trace columns
-
-The execution trace has 11 f64 columns per row (`TRACE_WIDTH`):
-
-| Index | Name | Description |
-| --- | --- | --- |
-| 0 | `v0_re` | Real part of amplitude register 0 |
-| 1 | `v0_im` | Imaginary part of amplitude register 0 |
-| 2 | `v1_re` | Real part of amplitude register 1 |
-| 3 | `v1_im` | Imaginary part of amplitude register 1 |
-| 4 | `gate_id` | Gate identifier for the current row |
-| 5 | `target_qubit` | Target qubit index |
-| 6 | `ctrl_active` | Control activation flag (> 0.5 = active) |
-| 7 | `ctrl_active_2` | Second control activation flag (for CCNOT) |
-| 8 | `ctrl_qubit` | Control qubit index |
-| 9 | `ctrl_qubit_2` | Second control qubit index |
-| 10 | `transition_link` | Transition continuity flag (1.0 = link to next row) |
-
-**Row pattern.** Each active gate contributes a *pre-gate* row (parameters set, amplitudes before the operator) and a *post-gate* row (`gate_id = 0`, amplitudes after). A terminal boundary row ends the segment with `transition_link = 0`.
-
-### C.2 Gate encoding
-
-| `gate_id` | Gate | Description |
-| --- | --- | --- |
-| 0 | NONE | Post-gate or terminal row |
-| 1 | H | Hadamard |
-| 2 | X | Pauli-X (NOT) |
-| 3 | Y | Pauli-Y |
-| 4 | Z | Pauli-Z |
-| 5 | RX | Rotation-X |
-| 6 | RY | Rotation-Y |
-| 7 | RZ | Rotation-Z |
-| 8 | CNOT | Controlled-X |
-| 9 | CZ | Controlled-Z |
-| 10 | CCNOT | Toffoli (controlled-controlled-X) |
-| 11 | MEASURE | Measurement (trajectory branch) |
-| 12 | IDLE | Idle (no-op, amplitudes unchanged) |
-
-### C.3 Expanded AIR columns
-
-The prover expands the 11-column trace to 21 AIR columns before constraint evaluation:
-
-| AIR columns | Source | Purpose |
-| --- | --- | --- |
-| 0–3 | `v0_re`, `v0_im`, `v1_re`, `v1_im` | Amplitude registers |
-| 4 | `gate_id` | Gate selector |
-| 5 | `target_qubit` | Target qubit |
-| 6 | `ctrl_active` | Control flag selector |
-| 7 | `ctrl_active_2` | Second control flag selector |
-| 8 | `ctrl_qubit` | Control qubit |
-| 9 | `ctrl_qubit_2` | Second control qubit |
-| 10 | `transition_link` | Link continuity |
-| 11–20 | selector expansion | Gate-specific one-hot selectors derived from `gate_id` |
-
-### C.4 Constraints
-
-1. **Amplitude continuity.** When `transition_link = 1.0`, adjacent rows in the same amplitude register must be equal. This links post-gate rows to the next pre-gate row when the next gate operates on the same target qubit.
-2. **Gate semantics.** Each active gate enforces a specific complex-linear map on $(v_0, v_1)$:
-* **H** (Hadamard): $\vert{}0\rangle \mapsto (\vert{}0\rangle + \vert{}1\rangle)/\sqrt{2}$, $\vert{}1\rangle \mapsto (\vert{}0\rangle - \vert{}1\rangle)/\sqrt{2}$.
-* **X, Y, Z**: standard Pauli rotations.
-* **RX, RY, RZ**: rotation gates by a fixed angle.
-* **CNOT**: flips target when control is $\vert{}1\rangle$.
-* **CZ**: phase-flips target when control is $\vert{}1\rangle$.
-* **CCNOT** (Toffoli): flips target when both controls are $\vert{}1\rangle$.
-* **MEASURE**: collapses to $\vert{}0\rangle$ or $\vert{}1\rangle$; no amplitude continuity constraint.
-* **IDLE**: amplitudes unchanged.
-
-
-3. **Selector consistency.** `gate_id` must decode bijectively to the one-hot selector columns (columns 11–20). Exactly one selector is 1.0 and the remainder are 0.0.
-4. **Control consistency.** When `ctrl_active = 1.0`, the control qubit index must be valid and the gate behaviour must depend on the control amplitude.
-5. **Boundary condition.** The terminal row amplitudes must match the boundary values committed in the v1 proof header ($2^{30}$ fixed-point).
-
----
-
-## References (project)
-
-1. World Quantum Computer Whitepaper v0.3, §3.3–3.4 — recursive aggregation and polymorphic outputs.
-2. Appendices B (binary layouts) and C (AIR column reference) in this document.
-3. Polygon Plonky3 — uni-STARK, Circle PCS, FRI over Mersenne31.
-4. Ben-Sasson et al., *Scalable, transparent, and post-quantum secure computational integrity* (STARK foundations).
+1. World Quantum Computer Whitepaper v0.3, §3.3–3.4 — Recursive Aggregation and Polymorphic Outputs.
+2. Polygon Plonky3 Architecture — Uni-STARK Engine, Circle PCS, and FRI over Mersenne31.
+3. Eli Ben-Sasson, Iddo Bentov, Ynon Horesh, and Michael Riabzev. *Scalable, transparent, and post-quantum secure computational integrity* (STARK Foundations).
