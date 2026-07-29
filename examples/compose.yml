@@ -158,6 +158,10 @@ services:
       WQC_BASE_FEE_MAX: "0.01"
       WQC_BASE_FEE_TARGET_QUEUE: "10"
       WQC_BASE_FEE_ADJUST_BPS: "500"
+      # PCS open call defaults on; set false to force direct orchestrator compose fallback.
+      WQC_PCS_OPEN_CALL_ENABLED: ${WQC_PCS_OPEN_CALL_ENABLED:-true}
+      WQC_PCS_OPEN_CALL_TIMEOUT_SECS: ${WQC_PCS_OPEN_CALL_TIMEOUT_SECS:-1800}
+      WQC_BLOB_MAX_BYTES: ${WQC_BLOB_MAX_BYTES:-33554432}
     networks:
       wqc-e2e:
         ipv4_address: 10.0.3.11
@@ -275,6 +279,8 @@ services:
       WQC_CONNECTION_MODE: uds
       WQC_SOCKET_PATH: /var/run/wqc-core-05.sock
       WQC_MPS_MAX_BOND_DIM: "128"
+      # Spill builder for optional PCS open-call E2E (node probes core /sysinfo).
+      WQC_PCS_MEMORY_POLICY: spill
     networks:
       wqc-e2e:
         ipv4_address: 10.0.1.15
