@@ -322,12 +322,20 @@ Orchestrator ─── /wqc/tensor-pcs-req/1.0.0 ───► Candidate Worker N
 Orchestrator ◄─── /wqc/tensor-pcs/1.0.0 ────── Candidate Worker Node
                      { leaf_pcs_b64 }  or  { refused: true, refuse_reason }
 
+Orchestrator ─── /wqc/tensor-pcs-open/1.0.0 ──► All connected nodes (majority exhausted)
+                     │
+                     │  spill nodes: GET /sysinfo (core) → bid
+                     │
+Orchestrator ◄─── /wqc/tensor-pcs-bid/1.0.0 ── Spill-policy nodes
+                     { pcs_memory_policy: "spill", leaf_proof_hash, ... }
+
 ```
 
 1. **Request Dispatch:** At quorum, the orchestrator records the quorum majority node list and transmits an Ed25519-signed request containing `sub_task_id` and `node_id` over `/wqc/tensor-pcs-req/1.0.0` to the first slice proof winner.
 2. **Candidate Build & Response:** The nominated node calls core `POST /leaf_pcs` with its retained leaf STARK proof. On success, core returns the encoded `LeafPcsBundle`; the node streams it to the orchestrator on `/wqc/tensor-pcs/1.0.0` as `leaf_pcs_b64`. If the PCS memory gate refuses (core HTTP 422, `PCS memory: ... (policy=refuse)`), the node permanently reports `refused: true` on `/wqc/tensor-pcs/1.0.0` (no retry). Only the currently nominated node may submit PCS for a slice.
 3. **Failover & Compensation:** Upon refusal, the orchestrator records the refusing node, updates the slice proof winner (`StoreFinalSliceProof`) to the next quorum majority candidate that still holds a valid pending proof, and re-sends `/wqc/tensor-pcs-req/1.0.0` to that node. Storing a valid bundle compensates the successful candidate with $R_{\mathrm{pcs}}$ (40% of the slice fee).
-4. **Finalization & Fallback:** Compose waits until PCS is **satisfied** — a bundle is stored, or all quorum majority candidates are exhausted (`Exhausted` marker). While alternates remain, partial refusals do not trigger fallback. If no bundle arrives and candidates are not yet exhausted, the orchestrator waits up to `WQC_PCS_TIMEOUT_SECS` (default 7200s), then triggers a local fallback build (`build_leaf_pcs_bundle_from_child`), leaving $R_{\mathrm{pcs}}$ unpaid.
+4. **PCS Open Call (CAS builder market):** When all quorum majority candidates are exhausted and `WQC_PCS_OPEN_CALL_ENABLED` is true (default), the orchestrator uploads the proof winner's leaf STARK bytes to S3 (CAS key = SHA-256 hex), records `Phase=open_call`, and fans out a signed announcement on `/wqc/tensor-pcs-open/1.0.0`. Spill-policy nodes probe connected `wqc-core` `GET /sysinfo` → `pcs_memory_policy` and bid on `/wqc/tensor-pcs-bid/1.0.0` with `pcs_memory_policy: "spill"`. The orchestrator nominates the first valid bidder (first-wins), sends `/wqc/tensor-pcs-req/1.0.0` with `request_kind: "open_call"` and `leaf_proof_hash`, and pays $R_{\mathrm{pcs}}$ to the builder that delivers the bundle. The builder fetches the proof from the presigned CAS URL (no local retained proof required), verifies SHA-256, and calls core `POST /leaf_pcs`. On builder refusal or timeout (`WQC_PCS_OPEN_CALL_TIMEOUT_SECS`, default 1800s), the orchestrator re-publishes the open call with updated `refused_builders` until exhausted.
+5. **Finalization & Fallback:** Compose waits until PCS is **satisfied** — a bundle is stored, or all quorum majority candidates are exhausted and (if enabled) the open-call round is exhausted (`OpenCallExhausted`). While `Phase=open_call` without a bundle, `Exhausted=true` alone does **not** satisfy compose. If no bundle arrives, the orchestrator waits up to `WQC_PCS_TIMEOUT_SECS` (default 7200s) for majority nomination when open call is disabled, then triggers a local fallback build (`build_leaf_pcs_bundle_from_child`), leaving $R_{\mathrm{pcs}}$ unpaid.
 
 #### Artifact Footprint Analysis
 
@@ -348,7 +356,7 @@ When the gate is active and estimated RAM exceeds the budget, `WQC_PCS_MEMORY_PO
 | Environment Variable | Default | Role |
 | --- | --- | --- |
 | `WQC_MAX_MEMORY_GB` | *(unset)* | Enables the PCS memory gate when set; unset disables gating. |
-| `WQC_PCS_MEMORY_POLICY` | `refuse` | `refuse` (fail prove) or `spill` (auto-lower Mmcs chunk). |
+| `WQC_PCS_MEMORY_POLICY` | `refuse` | `refuse` (fail prove) or `spill` (auto-lower Mmcs chunk). Set on **wqc-core**; exposed via `GET /sysinfo` → `pcs_memory_policy` for node open-call bid gating. |
 | `WQC_PCS_MMCS_GROUP_CHUNK` | `24` | Mmcs group chunk size for leaf/agg PCS prove (time vs wire trade-off). |
 | `WQC_PCS_MEMORY_ESTIMATE_SCALE` | *(unset)* | Optional multiplier on the peak-RAM estimate. |
 
