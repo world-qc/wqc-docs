@@ -46,10 +46,11 @@ Production proof generation is configured over the Mersenne31 prime field using 
 
 This document specifies the complete cryptographic proof architecture of WQC:
 
-* Public-input binding schema linking task assignments to proof artifacts.
+* Public-input binding schema linking task assignments to proof artifacts (including optional `MSH1` / `SEC1` fields).
 * Algebraic Intermediate Representation (AIR) specifications for unitary execution.
 * Auxiliary probability distribution and measurement trajectory constraints.
 * Binary recursive composition trees, including v4 `AggregationAir` and v6 `RecursiveAggregationAir` with in-circuit out-of-domain (OOD) PCS verification.
+* `security_level` → FRI query ladder for leaf unitary / Born / trajectory prove/verify and outer AggregationAir / RecAgg / leaf PCS certificates (§5.1). Nested FriFold/DeepRo/Mmcs sub-STARKs keep a fixed 40-query config.
 * Operational bounds, memory gating policies, and P2P Leaf PCS delivery workflows.
 
 ---
@@ -95,6 +96,7 @@ Computational logic is framed as an execution trace matrix $T \in \mathbb{F}^{T_
 * **Base Field:** Mersenne31 ($\mathbb{F}_p$, where $p = 2^{31} - 1$).
 * **Commitment Scheme:** Circle PCS implemented via Polygon Plonky3.
 * **Serialization:** Postcard serialization format encoding `p3_uni_stark::Proof` structures.
+* **FRI queries:** Circle config `num_queries` is selected from the Orchestrator `security_level` for leaf unitary / Born / trajectory STARKs and for outer AggregationAir / RecAgg proofs (see §5.1). Leaf and aggregation PCS certificates use runtime `n = proof.query_proofs.len()` (capped at 40). Nested FriFold / DeepRo / Mmcs uni-STARKs keep fixed 40-query configs. Empty / unknown level defaults to $40$ (`DEVNET_FRI_NUM_QUERIES`). This ladder is an **operational cost/throughput control**, not a claim of calibrated soundness bits.
 
 Legacy transcript profile v1 embeds uncompressed floating-point traces evaluated via explicit verifier sumchecks, whereas production profile v2 commits traces via Circle PCS.
 
@@ -150,10 +152,35 @@ To prevent proof-swapping attacks, every leaf proof commits to a rigid `StarkCon
 | `output_hash` | Mandatory | SHA3-256 hash of the computed output payload (scalar or counts JSON). |
 | `terminal_statevector_digest` | Optional | SHA3-256 digest linking unitary state vector to Born / trajectory claims. |
 | `measurement_spec_hash` | Optional | SHA3-256 digest of measurement specification (`MSH1` prefix). |
+| `security_level` | Optional | Orchestrator security tier (`low` \| `normal` \| `high` \| `ultra`); bound with `SEC1` prefix when non-empty on unitary leaves. Selects FRI `num_queries` for unitary / Born / trajectory / AggregationAir / RecAgg outer STARKs (§5.1). |
 
 Formally, the mandatory public input tuple is defined as:
 
 $$\mathsf{PI} = \{\,\texttt{circuit\_id},\ \texttt{sub\_task\_id},\ \texttt{node\_id},\ \texttt{slice\_id},\ \texttt{output\_hash}\,\} \quad \text{}$$
+
+### 5.1 SecurityLevel → FRI Query Ladder
+
+Client `security_level` already drives quorum (`required_votes`) and bid policy. The same tier is copied onto each signed `SubTask` dispatch and threaded orch → node → `wqc-core` for leaf prove/verify, then through compose / RecAgg for the whole task tree (CGO FFI passes the level into leaf and root verifiers).
+
+| `security_level` | FRI `num_queries` |
+| --- | ---: |
+| `low` | 8 |
+| `normal` | 16 |
+| `high` | 32 |
+| `ultra` (or empty / unknown) | 40 |
+
+**Binding and authority:**
+
+* When non-empty, unitary prove appends `SEC1<security_level>\0` after optional `MSH1…` in the leaf PI binding (Appendix B.1 / B.2). Born / trajectory inherit the parent context level without a separate `SEC1` tag.
+* Orchestrator verify uses `SubTask.security_level` as authoritative. If a unitary proof binds a different `SEC1` value, verification fails.
+* Prove and verify must use the **same** query count; mismatched ladders reject the Plonky3 proof.
+* PCS certificates take `n` from `proof.query_proofs.len()` and optionally cross-check against `fri_num_queries_for_security_level(level)`. Wire vectors are length-prefixed with `1 <= n <= 40`.
+
+**Scope:** Outer Circle STARKs (unitary, Born, trajectory, AggregationAir, RecAgg) and leaf/agg PCS query slots follow this ladder. Nested FriFold / DeepRo / Mmcs **internal** uni-STARKs remain on fixed 40-query Circle/Keccak configs; only the count of outer FRI query slots varies.
+
+**Why nested sub-STARKs stay at 40:** Outer `n` is the number of FRI query *slots* that PCS / RecAgg materialize (Mmcs paths, FriFold chains, DeepRo steps per query). That slot count dominates prove time and certificate size, so binding it to `security_level` is the operational lever. Each nested FriFold / DeepRo / Mmcs proof is a *separate* small uni-STARK that attests one path or fold step; its own Circle/Keccak `num_queries` is an implementation parameter of that sub-proof, not “how many outer queries the parent opened.” Keeping nested configs fixed at the ladder ceiling avoids resizing nested AIR public inputs, soft caps, and prove/verify pairing for every sub-STARK while still cutting the dominant outer work for `low` / `normal` / `high`. Making nested `num_queries` follow the ladder is intentionally out of scope.
+
+**Risk of fewer outer queries:** FRI soundness error decreases as more random queries are checked; lowering `n` (e.g. `ultra` $40$ → `low` $8$) increases the chance that a malicious or buggy proof escapes detection for a given hash/FRI parameter set. In this stack the ladder is an **operational cost/throughput control**, not a claim that `low` / `normal` / `high` achieve calibrated bit-security targets. Clients and operators should treat lower tiers as accepting higher residual FRI soundness risk (and smaller / faster proofs) relative to `ultra`, and must not infer cryptographic security levels from the table above. Prove and verify must still use the same `n`; a mismatch is a hard reject, not a soft downgrade.
 
 ---
 
@@ -377,8 +404,10 @@ Operational caps for the noiseless simulation regime are defined as follows:
 | Maximum Born Recursion Outcomes ($K$; RecAgg) | $K \le 21$ ($W \le 68$) |
 | Maximum Trajectory Marginal zk Qubits | 16 qubits |
 | Maximum Per-Shot Trajectory Events | 2048 events |
+| Default / `ultra` FRI queries (outer STARKs + PCS cert slots) | 40 |
+| `low` / `normal` / `high` FRI queries (outer ladder) | 8 / 16 / 32 |
 
-Note: These constraints represent software engineering boundaries for current streaming AIR layouts and do not reflect fundamental cryptographic limits of the underlying zk-STARK protocol.
+Note: These constraints represent software engineering boundaries for current streaming AIR layouts and do not reflect fundamental cryptographic limits of the underlying zk-STARK protocol. FRI query counts by `security_level` are operational (see §5.1), not calibrated soundness claims.
 
 ---
 
@@ -410,10 +439,10 @@ A verifier executes the following deterministic validation pipeline upon receivi
 ```
 
 1. **Marker Detection:** Reads protocol header markers (`_M31_QUANTUM_AIR_V1_`, `_M31_PLONKY3_STARK_V2_`, `_WQC_COMPOSE_V3_`), rejecting legacy or invalid markers.
-2. **Public Input Context Binding:** Asserts equality between proof context $\mathsf{PI}$ and dispatch parameters (`circuit_id`, `sub_task_id`, `node_id`, `slice_id`, `output_hash`).
+2. **Public Input Context Binding:** Asserts equality between proof context $\mathsf{PI}$ and dispatch parameters (`circuit_id`, `sub_task_id`, `node_id`, `slice_id`, `output_hash`). When present, checks optional `MSH1` / `SEC1` bindings; Orchestrator `SubTask.security_level` must match any bound `SEC1` value (§5.1).
 3. **Core STARK Verification:**
 * *v1:* Re-expands execution trace, verifying $\texttt{air\_sum} == 0$ and matching boundary fixed-point constraints.
-* *v2:* Reconstructs AIR from execution parameters, validating FRI proofs over Circle PCS alongside attached auxiliary segments.
+* *v2:* Reconstructs AIR from execution parameters, validating FRI proofs over Circle PCS with `num_queries` from `security_level` (unitary), alongside attached auxiliary segments.
 * *v3:* Evaluates binary tree child hashes and recursively verifies child STARKs (and `AggregationAir` tails if present).
 4. **Sampling Determinism Check:** Re-runs deterministic PRNG sampling over committed probability tables, asserting that calculated counts reproduce `output_hash`.
 5. **Root Verification & Settlement:** Seals `proof_root_hash` and commits `root.bin` artifacts for network consensus settlement.
@@ -427,7 +456,7 @@ The WQC proof engine implements a scalable D-PoUW framework. By shifting proving
 Key research and optimization priorities include:
 
 1. **Proof Footprint Reduction:** Shrinking recursive proof artifacts (currently $\approx 16\text{ MiB}$ for two-leaf composed roots) via Poseidon2 recursion-friendly hashes within Mmcs folding circuits.
-2. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction, expanding multi-chunk leaf DeepRo structures, and enabling runtime FRI query adjustments mapped to security parameters.
+2. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction and expanding multi-chunk leaf DeepRo structures. The `security_level` → FRI query ladder (§5.1) now covers Born / trajectory STARKs and variable-length leaf PCS / RecAgg certificates (nested FriFold/DeepRo/Mmcs internals remain 40-query configs).
 3. **Extended Zero-Knowledge Limits:** Expanding Born and trajectory zero-knowledge AIR capacity beyond current 16-qubit streaming bounds.
 4. **Noise-Aware STARK Constraints:** Formally incorporating stochastic physical noise models (e.g., depolarizing channels and readout error operators) directly into the transition AIR.
 
@@ -454,6 +483,7 @@ Key research and optimization priorities include:
 | `REC_TAIL_MARKER` (v5, legacy) | `_WQC_REC_TAIL_V5_` |
 | `V5_REC_AGG_INNER_MARKER` | `_WQC_REC_AGG_V5_` |
 | Measurement Spec Prefix | `MSH1` |
+| Security Level Prefix | `SEC1` |
 
 ---
 
@@ -469,6 +499,7 @@ All string fields are NUL-terminated UTF-8 sequence bytes. Multi-byte integers a
 <circuit_id\0><node_id\0><slice_id\0><output_hash\0>
 [optional terminal_statevector_digest\0]
 [optional MSH1<measurement_spec_hash>\0]
+[optional SEC1<security_level>\0]
 <trace_rows: u32 LE>
 <trace: f64 LE array of size (trace_rows × 11)>
 <air_sum: u32 LE>
@@ -485,6 +516,7 @@ All string fields are NUL-terminated UTF-8 sequence bytes. Multi-byte integers a
 <circuit_id\0><node_id\0><slice_id\0><output_hash\0>
 [optional terminal_statevector_digest\0]
 [optional MSH1<measurement_spec_hash>\0]
+[optional SEC1<security_level>\0]
 <proof_len: u32 LE>
 <proof: postcard-encoded p3_uni_stark::Proof>
 
