@@ -121,8 +121,8 @@ services:
     container_name: wqc-orchestrator-01
     build:
       context: ../../wqc-orchestrator
-      dockerfile: Dockerfile
-    image: world-qc/wqc-orchestrator:latest
+      dockerfile: Dockerfile.dev
+    image: world-qc/wqc-orchestrator:dev
     environment:
       WQC_LOG_FORMAT: json
       WQC_LOG_LEVEL: info
