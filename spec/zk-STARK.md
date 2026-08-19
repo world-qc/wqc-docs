@@ -2,6 +2,8 @@
 
 **A Formal Protocol Specification for the World Quantum Computer (WQC) Cryptographic Proof Engine**
 
+- **Tier:** A (canonical protocol spec)
+
 ---
 
 ## Abstract
@@ -107,6 +109,8 @@ Let $\pi$ denote a proof artifact, $\mathsf{PI}$ the public-input vector, and $H
 ---
 
 ## 4. Architecture Overview
+
+The cryptographic proof pipeline below is the worker–compose–root path. The live process map (HTTP client, orchestrator, p2p-proxy, node, core, composer, CAS) is [`architecture-current.md`](architecture-current.md); the target-state system is specified in [`architecture.md`](architecture.md).
 
 ```
                     ┌─────────────────────────┐
