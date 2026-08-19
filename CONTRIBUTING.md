@@ -22,16 +22,21 @@ If you are unsure which category applies, open an issue first and describe the i
 
 ## Document tiers (read this before editing)
 
-Not every Markdown file has the same weight. Maintainers treat documents differently depending on how much they define the protocol.
+Not every Markdown file has the same weight. Maintainers treat documents differently depending on how much they define the protocol. **Path does not decide the tier.** The current inventory is the [Document Map in README.md](README.md#document-map); this file only states how to classify a document and how to review it.
+
+### How to classify
+
+1. If the document has a front-matter line `- **Tier:** A`, `B`, or `C`, that field is authoritative.
+2. Otherwise apply these directory defaults:
+   - **A** — versioned whitepapers under `/whitepaper/`, and `/tokenomics/` or `/manifesto/` when present
+   - **B** — `/examples/`
+   - **C** — this file, `README.md`, `CODE_OF_CONDUCT.md`, license text
+3. Files under `/spec/` have **no** directory default. They must declare `Tier:` in front matter. A spec PR that omits it is incomplete.
+4. If still unclear, treat the change as **Tier A** and open an issue before rewriting meaning.
 
 ### Tier A — Canonical protocol documents (protected)
 
-These define the public protocol narrative and must not be rewritten casually:
-
-- `/whitepaper/` — versioned whitepapers (e.g. `WHITEPAPER_0.3_en.md`) and related scope notes
-- Yellowpapers and formal appendices (when present under `/whitepaper/` or `/spec/`)
-- `/tokenomics/` — economic model text that may be cited externally (when present)
-- `/manifesto/` — project manifesto text (when present)
+These define the public protocol narrative (whitepapers, yellowpaper-like specs, target architecture, tokenomics). They must not be rewritten casually.
 
 **Rules for Tier A:**
 
@@ -42,22 +47,16 @@ These define the public protocol narrative and must not be rewritten casually:
    - the proposed replacement (or a clear outline)
    - whether implementations (`wqc-core`, `wqc-node`, `wqc-orchestrator`, …) already match the proposal
 3. **One concern per PR.** Do not mix typo cleanup with protocol redesign.
-4. **Versioned whitepapers are historical.** Prefer adding a **new versioned file** (e.g. `WHITEPAPER_0.4_en.md`) or an errata / scope note over rewriting an already published version in place. In-place edits to published versions are limited to errata-style corrections that maintainers explicitly approve.
+4. **Versioned whitepapers are historical.** Prefer adding a **new versioned file** or an errata / scope note over rewriting an already published version in place. In-place edits to published versions are limited to errata-style corrections that maintainers explicitly approve.
 5. **Maintainers may close or request redesign** of PRs that change Tier A meaning without prior discussion. This is intentional: these docs are cited by the community and must stay reviewable.
 
 ### Tier B — Working specs and examples
 
-- `/spec/` — API and networking specifications
-- `/examples/` — circuits, scripts, and README guides
-- Operational notes that are not versioned whitepapers
-
-These may evolve with the codebase. Still keep PRs focused, and call out any behavior change that workers or clients must follow.
+Implementation snapshots, examples, and operational notes that track the codebase. These may evolve with the code. Still keep PRs focused, and call out any behavior change that workers or clients must follow.
 
 ### Tier C — Meta docs
 
-- `README.md`, this `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, license text
-
-Improvements are welcome; keep tone consistent with the rest of the archive.
+Contributor-facing repo meta. Improvements are welcome; keep tone consistent with the rest of the archive.
 
 ## Typos and small clarity fixes
 
@@ -82,9 +81,10 @@ English in this repository is authoritative for protocol wording.
 3. Use clear Markdown:
    - One H1 title
    - Stable section headings
-   - Explicit version or “status” line near the top (`Draft`, `Active`, `Superseded`)
+   - Front matter including **Status** and, for `/spec/` files, **Tier** (`A` or `B`)
 4. Link related implementation docs (e.g. `wqc-core` README, `trace-spec`) when the spec depends on them.
 5. If the spec changes wire formats or APIs, note compatibility impact in the PR.
+6. Add the file to the [README Document Map](README.md#document-map).
 
 ### Suggested front matter for new specs
 
@@ -92,6 +92,7 @@ English in this repository is authoritative for protocol wording.
 # Title
 
 - **Status:** Draft
+- **Tier:** B
 - **Audience:** Worker implementers
 - **Related:** wqc-node P2P protocols, wqc-core `/compute`
 ```
