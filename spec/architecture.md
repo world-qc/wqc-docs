@@ -3,7 +3,7 @@
 - **Status:** Draft
 - **Tier:** A (canonical protocol spec)
 - **Audience:** Protocol designers, researchers, and readers who need a specification of the finished system before it is fully built
-- **Related:** [`architecture-current.md`](architecture-current.md) (current implementation), [`zk-STARK.md`](zk-STARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
+- **Related:** [`architecture-current.md`](architecture-current.md) (current implementation), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
 
 ## Abstract
 
@@ -42,7 +42,7 @@ The target architecture defines:
 
 - The zk-STARK transcript, AIR constraints, and recursion internals — specified in [`zk-STARK.md`](zk-STARK.md).
 - The current implementation layout — specified in [`architecture-current.md`](architecture-current.md).
-- The narrative vision, tokenomics math, and marketing framing — the [`whitepaper`](../whitepaper/WHITEPAPER_0.3_en.md).
+- The narrative vision, tokenomics math, and marketing framing — the [`whitepaper`](../whitepaper/WHITEPAPER_0.3_en.md). Fee/settlement norms — [`economics.md`](economics.md).
 
 ### 1.3 Relationship to the roadmap
 
@@ -286,21 +286,23 @@ that will be produced before mainnet.
 
 ## 8. Economic and settlement model
 
-The economics of the network are specified in detail in the
-[whitepaper](../whitepaper/WHITEPAPER_0.3_en.md); this section fixes only the architecture
-constraints:
+Normative fees, escrow, identities, and on-chain settlement rules:
+[`economics.md`](economics.md). Product narrative (supply, vesting story):
+[whitepaper](../whitepaper/WHITEPAPER_0.3_en.md) §4.
+
+Architecture constraints that economics must satisfy:
 
 - **Escrow as the unit of commitment.** Every task carries an upfront escrow computed from
   the compact-register slice bound. The escrow is the maximum the client can lose and the
   miners' guarantee of payment.
 - **Gas market.** The price of work reflects supply (miner capacity) and demand (queued
-  tasks) on-chain; the mechanism must be transparent and not manipulable by the
-  coordinator.
-- **Burn.** The automatic burn rate is a fixed protocol constant applied at settlement.
+  tasks); the mechanism must be transparent and not manipulable by the coordinator.
+- **Burn.** The automatic burn rate is a fixed protocol constant applied at settlement
+  (straggler draws may reduce *effective* burn below the nominal 20%).
 - **Reward distribution.** Rewards are computed from attested work reports, which are
   themselves bound into the proof pipeline, so payment cannot be inflated by an operator.
-- **Dispute economics.** Challenging a manifest costs a small bond that is forfeit if the
-  challenge fails, preventing denial-of-service via arbitration spam.
+- **Dispute economics.** Challenging a settled root commitment costs a bond that is forfeit
+  if the challenge fails (optimistic settlement path).
 
 ---
 
