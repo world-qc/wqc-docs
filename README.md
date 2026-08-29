@@ -13,6 +13,7 @@ This repository serves as the single source of truth for the World Quantum Compu
 | [`/spec`](spec/) | Present | mixed | Protocol specifications — each file declares `Tier:` in front matter |
 | [`/spec/architecture.md`](spec/architecture.md) | Draft | A | Target (sovereign) architecture: actors, trust, on-chain settlement, DHT coordination |
 | [`/spec/architecture-current.md`](spec/architecture-current.md) | Working spec | B | Live implementation map: daemons, trust boundaries, task lifecycle |
+| [`/spec/circuit-payload.md`](spec/circuit-payload.md) | Working spec | B | Circuit payload meaning: gate grammar, measurement, output modes, determinism, scale limits |
 | [`/spec/zk-STARK.md`](spec/zk-STARK.md) | Present | A | zk-STARK protocol specification (narrative + normative appendices) |
 | [`/spec/economics.md`](spec/economics.md) | Draft | A | D-PoUW fees, escrow, economics receipt, on-chain settlement (atomic finalize, optimistic commitment) |
 | [`/examples`](examples/) | Present | B | Circuit SSOT, E2E harness, [`compose.yml`](examples/compose.yml) (builds need sibling monorepo checkouts — see [`examples/README.md`](examples/README.md)) |
