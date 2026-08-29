@@ -2,8 +2,11 @@
 
 [![License: GFDL-1.3](https://img.shields.io/badge/License-GFDL--1.3-blue.svg)](https://www.gnu.org/licenses/fdl-1.3.html)
 [![Whitepaper](https://img.shields.io/badge/Whitepaper-Latest-blue.svg)](https://world-qc.io/docs/WHITEPAPER_en.pdf)
+[![API Reference](https://img.shields.io/badge/API-Reference-blue.svg)](https://world-qc.github.io/wqc-docs/)
 
 This repository serves as the single source of truth for the World Quantum Computer (WQC) protocol. It contains the mathematical foundations, economic models, and philosophical manifestos of the project.
+
+The HTTP API reference is rendered at **<https://world-qc.github.io/wqc-docs/>**.
 
 ## Document Map
 
@@ -17,6 +20,8 @@ This repository serves as the single source of truth for the World Quantum Compu
 | [`/spec/p2p-protocols.md`](spec/p2p-protocols.md) | Working spec | B | Swarm libp2p wire contract: protocol IDs, framing, signature payload layouts, message shapes |
 | [`/spec/zk-STARK.md`](spec/zk-STARK.md) | Present | A | zk-STARK protocol specification (narrative + normative appendices) |
 | [`/spec/economics.md`](spec/economics.md) | Draft | A | D-PoUW fees, escrow, economics receipt, on-chain settlement (atomic finalize, optimistic commitment) |
+| [`/openapi`](openapi/) | Generated | — | Published HTTP API descriptions, synced from the implementation repositories — **not** edited here ([why](openapi/README.md)) |
+| [`/site`](site/) | Generated | — | Sources for the rendered API reference published to GitHub Pages |
 | [`/examples`](examples/) | Present | B | Circuit SSOT, E2E harness, [`compose.yml`](examples/compose.yml) (builds need sibling monorepo checkouts — see [`examples/README.md`](examples/README.md)) |
 | [`/examples/E2E.md`](examples/E2E.md) | Present | B | Reference-stack E2E guide (manual + automated + signoff) |
 | `/tokenomics` | Planned | A | Fair launch ops and vesting package (must align with [`spec/economics.md`](spec/economics.md) and the whitepaper) |

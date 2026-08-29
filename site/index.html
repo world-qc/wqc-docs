@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WQC Protocol — API Reference</title>
+<meta name="description" content="HTTP API reference and protocol specifications for the World Quantum Computer protocol.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --panel-hover: #191d23;
+    --border: #262b33;
+    --text: #e6e9ee;
+    --muted: #8b949e;
+    --accent: #4da3ff;
+    --accent-dim: #1f3a5c;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #ffffff; --panel: #f6f8fa; --panel-hover: #eef1f5; --border: #d8dee4;
+      --text: #1f2328; --muted: #59636e; --accent: #0969da; --accent-dim: #ddf4ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 72px 24px 96px; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 32px; margin-bottom: 48px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 12px;
+  }
+  h1 { font-size: 34px; line-height: 1.2; margin: 0 0 14px; font-weight: 600; letter-spacing: -.02em; }
+  .lede { color: var(--muted); font-size: 17px; margin: 0; max-width: 62ch; }
+  h2 {
+    font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin: 48px 0 16px;
+  }
+  .cards { display: grid; gap: 14px; }
+  a.card {
+    display: block; padding: 22px 24px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px;
+    text-decoration: none; color: inherit; transition: background .15s, border-color .15s;
+  }
+  a.card:hover { background: var(--panel-hover); border-color: var(--accent); }
+  .card-title { font-size: 17px; font-weight: 600; margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px; }
+  .card-desc { color: var(--muted); font-size: 15px; margin: 0; }
+  .badge {
+    font-family: var(--mono); font-size: 11px; font-weight: 500; padding: 2px 8px;
+    border-radius: 20px; background: var(--accent-dim); color: var(--accent);
+    letter-spacing: .04em; white-space: nowrap;
+  }
+  ul.links { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+  ul.links a { color: var(--text); text-decoration: none; display: block; padding: 9px 12px; border-radius: 7px; }
+  ul.links a:hover { background: var(--panel); color: var(--accent); }
+  ul.links .desc { color: var(--muted); font-size: 14px; }
+  code { font-family: var(--mono); font-size: .9em; }
+  footer {
+    margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 14px;
+  }
+  footer a { color: var(--accent); }
+  #provenance { font-family: var(--mono); font-size: 12.5px; margin: 10px 0 0; }
+  #provenance div { margin-top: 3px; }
+  .note {
+    margin-top: 18px; padding: 14px 16px; border-left: 2px solid var(--border);
+    color: var(--muted); font-size: 14.5px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">World Quantum Computer</p>
+    <h1>Protocol &amp; API Reference</h1>
+    <p class="lede">
+      HTTP contracts for the two services a participant interacts with, plus the
+      normative specifications that define what the payloads mean.
+    </p>
+  </header>
+
+  <h2>HTTP APIs</h2>
+  <div class="cards">
+    <a class="card" href="orchestrator/">
+      <p class="card-title">Orchestrator Client API <span class="badge">port 9000</span></p>
+      <p class="card-desc">
+        Submit circuits, poll task status and manifests, query fee quotes and balances,
+        register an operator payout address, and discover libp2p bootstrap peers.
+      </p>
+    </a>
+    <a class="card" href="core/">
+      <p class="card-title">Core Engine API <span class="badge">port 3000</span></p>
+      <p class="card-desc">
+        The node-local simulation and proving engine. Node operators reach this on
+        localhost; it is not exposed to the swarm.
+      </p>
+    </a>
+  </div>
+
+  <h2>Normative specifications</h2>
+  <ul class="links">
+    <li><a href="https://github.com/world-qc/wqc-docs/blob/main/spec/circuit-payload.md">
+      Circuit payload semantics
+      <span class="desc">— gate grammar, measurement rules, output modes, determinism, scale limits</span>
+    </a></li>
+    <li><a href="https://github.com/world-qc/wqc-docs/blob/main/spec/p2p-protocols.md">
+      Swarm P2P protocols
+      <span class="desc">— libp2p protocol IDs, framing, signature payload layouts</span>
+    </a></li>
+    <li><a href="https://github.com/world-qc/wqc-docs/blob/main/spec/architecture-current.md">
+      Current architecture
+      <span class="desc">— components and the task lifecycle as implemented</span>
+    </a></li>
+    <li><a href="https://github.com/world-qc/wqc-docs/blob/main/spec/economics.md">
+      Economics
+      <span class="desc">— fees, rewards, and settlement</span>
+    </a></li>
+    <li><a href="https://github.com/world-qc/wqc-docs/blob/main/spec/zk-STARK.md">
+      zk-STARK
+      <span class="desc">— proof system and verification</span>
+    </a></li>
+  </ul>
+
+  <p class="note">
+    The API pages describe the structural contract — paths, status codes, and schemas.
+    What the fields <em>mean</em> is normative in the specifications above. Where the two
+    overlap, the specifications win.
+  </p>
+
+  <footer>
+    <p style="margin:0">
+      These API descriptions are snapshots copied from the implementation repositories,
+      which remain the source of truth. Generated from:
+    </p>
+    <p id="provenance"><span style="opacity:.6">loading…</span></p>
+    <p style="margin-top:22px">
+      <a href="https://github.com/world-qc/wqc-docs">wqc-docs on GitHub</a>
+      &nbsp;·&nbsp; Documentation licensed GFDL-1.3
+    </p>
+  </footer>
+
+</div>
+
+<script>
+  fetch("openapi/sources.json")
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (d) {
+      var el = document.getElementById("provenance");
+      el.textContent = "";
+      d.sources.forEach(function (s) {
+        var row = document.createElement("div");
+        row.textContent = s.repo + " @ " + s.sha.slice(0, 7);
+        el.appendChild(row);
+      });
+      var when = document.createElement("div");
+      when.style.opacity = ".6";
+      when.style.marginTop = "8px";
+      when.textContent = "synced " + d.synced_at;
+      el.appendChild(when);
+    })
+    .catch(function () {
+      document.getElementById("provenance").textContent = "see openapi/sources.json";
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Ruleset for the published API snapshots.
+#
+# The files under openapi/ are copies; anything genuinely wrong with them is fixed in
+# the implementation repository and arrives here on the next sync. The two adjustments
+# below are cases where the recommended rule does not describe this deployment, so
+# leaving them as errors would block documentation deploys forever rather than
+# prompting a fix.
+
+extends:
+  - recommended
+
+rules:
+  # Neither service defines an HTTP security scheme. Most routes are genuinely
+  # unauthenticated in the current alpha, and the settle endpoints model their shared
+  # token as explicit `Authorization` / `X-Settle-Submit-Token` header parameters. Once
+  # those become real securitySchemes upstream, restore this to error.
+  security-defined: warn
+
+  # Neither service has a public endpoint, so `localhost` is the accurate server value
+  # rather than a placeholder left behind.
+  no-server-example.com: off

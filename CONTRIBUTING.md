@@ -58,6 +58,14 @@ Implementation snapshots, examples, and operational notes that track the codebas
 
 Contributor-facing repo meta. Improvements are welcome; keep tone consistent with the rest of the archive.
 
+### Not tiered — generated content (`/openapi`, `/site`)
+
+`/openapi` holds HTTP API descriptions copied from the repositories that serve them, and `/site` holds the sources for the rendered reference published to GitHub Pages.
+
+**Do not hand-edit files under `/openapi`.** They are overwritten by the sync workflow, so a manual fix disappears on the next merge upstream and, until then, makes the published contract disagree with the running service. Fix the description in the implementation repository instead; a pull request opens here automatically. See [`openapi/README.md`](openapi/README.md).
+
+Changes to `/site` (layout, styling, the ReDoc template) are ordinary contributions and are reviewed like Tier C.
+
 ## Typos and small clarity fixes
 
 1. Fork and branch from `main`.
@@ -131,6 +139,7 @@ Examples:
 - “Drive-by” whitepaper edits that change economics, security claims, or roadmap without an issue
 - Translations that diverge from English meaning
 - Generated or scraped content without clear authorship and review
+- Hand edits to `/openapi` — change the description in the implementation repository
 - Secrets, private keys, or non-public infrastructure details
 
 ## Licensing
