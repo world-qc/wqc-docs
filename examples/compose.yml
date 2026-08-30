@@ -1,9 +1,9 @@
 # Reference E2E stack for wqc-docs/examples (minimal subset of a full devnet layout).
 #
-# Layout: this file lives under wqc-docs/examples/. Build contexts assume the
-# wqc-docs repo is checked out inside the World QC monorepo:
+# Layout: this file lives under wqc-docs/examples/. Build contexts assume separate
+# checkouts of sibling repos under one parent directory, for example:
 #
-#   <monorepo>/
+#   <parent>/
 #     wqc-core/ wqc-node/ wqc-orchestrator/ wqc-p2p-proxy/ wqc-stark-engine/
 #     wqc-docs/examples/compose.yml   <-- you are here
 #

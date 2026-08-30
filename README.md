@@ -22,7 +22,7 @@ The HTTP API reference is rendered at **<https://world-qc.github.io/wqc-docs/>**
 | [`/spec/economics.md`](spec/economics.md) | Draft | A | D-PoUW fees, escrow, economics receipt, on-chain settlement (atomic finalize, optimistic commitment) |
 | [`/openapi`](openapi/) | Generated | — | Published HTTP API descriptions, synced from the implementation repositories — **not** edited here ([why](openapi/README.md)) |
 | [`/site`](site/) | Generated | — | Sources for the rendered API reference published to GitHub Pages |
-| [`/examples`](examples/) | Present | B | Circuit SSOT, E2E harness, [`compose.yml`](examples/compose.yml) (builds need sibling monorepo checkouts — see [`examples/README.md`](examples/README.md)) |
+| [`/examples`](examples/) | Present | B | Circuit SSOT, E2E harness, [`compose.yml`](examples/compose.yml) (builds need separate checkouts of sibling repos — see [`examples/README.md`](examples/README.md)) |
 | [`/examples/E2E.md`](examples/E2E.md) | Present | B | Reference-stack E2E guide (manual + automated + signoff) |
 | `/tokenomics` | Planned | A | Fair launch ops and vesting package (must align with [`spec/economics.md`](spec/economics.md) and the whitepaper) |
 

@@ -5,7 +5,7 @@ Submit payloads live in [`circuits/`](circuits/); runners in [`e2e/`](e2e/).
 
 This document defines a **reference E2E stack** (logical services and URLs). Bring up a stack that satisfies §2 — including the bundled [`compose.yml`](compose.yml) sample — then run the scripts from this repository.
 
-**Images:** the sample compose file builds from sibling World QC repos in a monorepo checkout (`../../wqc-core`, `../../wqc-node`, …). Cloning only `wqc-docs` is not enough to `docker compose up` unless you already have equivalent images and retarget the compose file.
+**Images:** the sample compose file builds from sibling repos checked out under one parent directory (`../../wqc-core`, `../../wqc-node`, …). Cloning only `wqc-docs` is not enough to `docker compose up` unless you already have equivalent images and retarget the compose file.
 
 ## 1. Purpose and scope
 
@@ -42,7 +42,7 @@ A minimal reference stack matching the container names and ports assumed by the 
 | `wqc-core-01` … `wqc-core-05` | Compute workers (shared UDS volume) |
 | `wqc-node-01` … `wqc-node-05` | Worker nodes (5 required for full signoff) |
 
-**Layout requirement:** `compose.yml` expects `wqc-docs` inside the World QC monorepo (sibling checkouts of `wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-p2p-proxy`, `wqc-stark-engine`). See the header comment in [`compose.yml`](compose.yml).
+**Layout requirement:** `compose.yml` expects `wqc-docs` alongside separate checkouts of sibling repos (`wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-p2p-proxy`, `wqc-stark-engine`) under one parent directory. See the header comment in [`compose.yml`](compose.yml).
 
 **Secrets:** [`compose.yml`](compose.yml) does not embed credentials. Copy [`.env.example`](.env.example) to `examples/.env`, then fill values before starting the stack.
 
