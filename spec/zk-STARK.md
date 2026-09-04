@@ -392,7 +392,9 @@ Default deployment profiles set `WQC_PCS_MMCS_GROUP_CHUNK` to **24** (Mmcs group
 
 ### 8.4 PCS Memory Gating Policy
 
-To prevent Out-Of-Memory (OOM) failures during the blowup-16 Keccak Mmcs phase, core evaluates peak RAM usage prior to leaf/aggregation PCS prove when `WQC_MAX_MEMORY_GB` is set. When unset, the memory gate is **disabled** (no refuse/spill enforcement).
+To prevent Out-Of-Memory (OOM) failures during leaf/aggregation PCS build, core evaluates peak RAM usage prior to prove when `WQC_MAX_MEMORY_GB` is set. When unset, the memory gate is **disabled** (no refuse/spill enforcement).
+
+**Host-only PCS (production):** nested Mmcs / FriFold / OOD group STARKs are empty; the estimate is dominated by proof decode, sibling buffers, and native digest/fold checks (typically well under a 2 GiB devnet budget at 40q). The historical blowup-16 Keccak group-prove matrix is no longer the dominant term.
 
 When the gate is active and estimated RAM exceeds the budget, `WQC_PCS_MEMORY_POLICY` governs execution:
 
