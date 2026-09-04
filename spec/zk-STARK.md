@@ -51,8 +51,8 @@ This document specifies the complete cryptographic proof architecture of WQC:
 * Public-input binding schema linking task assignments to proof artifacts (including optional `MSH1` / `SEC1` fields).
 * Algebraic Intermediate Representation (AIR) specifications for unitary execution.
 * Auxiliary probability distribution and measurement trajectory constraints.
-* Binary recursive composition trees, including v4 `AggregationAir` and v6 `RecursiveAggregationAir` with in-circuit out-of-domain (OOD) PCS verification.
-* `security_level` → FRI query ladder for leaf unitary / Born / trajectory prove/verify and outer AggregationAir / RecAgg / leaf PCS certificates (§5.1). Nested FriFold/DeepRo/Mmcs sub-STARKs keep a fixed 40-query config.
+* Binary recursive composition trees, including v4 `AggregationAir` and v6 `RecursiveAggregationAir` with PCS certificates (host-bound Mmcs/FriFold/OOD digests; optional nested group STARKs).
+* `security_level` → FRI query ladder for leaf unitary / Born / trajectory prove/verify and outer AggregationAir / RecAgg / leaf PCS certificates (§5.1). Nested Mmcs / FriFold group STARKs **default to the same outer query count**; an optional `WQC_PCS_NESTED_FRI_QUERIES` ≤ outer is a size lever (shrink profile), not the production default.
 * Operational bounds, memory gating policies, and P2P Leaf PCS delivery workflows.
 
 ---
@@ -98,7 +98,7 @@ Computational logic is framed as an execution trace matrix $T \in \mathbb{F}^{T_
 * **Base Field:** Mersenne31 ($\mathbb{F}_p$, where $p = 2^{31} - 1$).
 * **Commitment Scheme:** Circle PCS implemented via Polygon Plonky3.
 * **Serialization:** Postcard serialization format encoding `p3_uni_stark::Proof` structures.
-* **FRI queries:** Circle config `num_queries` is selected from the Orchestrator `security_level` for leaf unitary / Born / trajectory STARKs and for outer AggregationAir / RecAgg proofs (see §5.1). Leaf and aggregation PCS certificates use runtime `n = proof.query_proofs.len()` (capped at 40). Nested FriFold / DeepRo / Mmcs uni-STARKs keep fixed 40-query configs. Empty / unknown level defaults to $40$ (`DEVNET_FRI_NUM_QUERIES`). This ladder is an **operational cost/throughput control**, not a claim of calibrated soundness bits.
+* **FRI queries:** Circle config `num_queries` is selected from the Orchestrator `security_level` for leaf unitary / Born / trajectory STARKs and for outer AggregationAir / RecAgg proofs (see §5.1). Leaf and aggregation PCS certificates use runtime `n = proof.query_proofs.len()` (capped at 40). Nested Mmcs / FriFold group STARKs default to that same outer `n`; they may use a smaller nested count via `WQC_PCS_NESTED_FRI_QUERIES` (§5.1). Nested DeepRo uni-STARKs still use the fixed 40-query Circle config. Empty / unknown level defaults to $40$ (`DEVNET_FRI_NUM_QUERIES`). This ladder is an **operational cost/throughput control**, not a claim of calibrated soundness bits.
 
 Legacy transcript profile v1 embeds uncompressed floating-point traces evaluated via explicit verifier sumchecks, whereas production profile v2 commits traces via Circle PCS.
 
@@ -180,11 +180,23 @@ Client `security_level` already drives quorum (`required_votes`) and bid policy.
 * Prove and verify must use the **same** query count; mismatched ladders reject the Plonky3 proof.
 * PCS certificates take `n` from `proof.query_proofs.len()` and optionally cross-check against `fri_num_queries_for_security_level(level)`. Wire vectors are length-prefixed with `1 <= n <= 40`.
 
-**Scope:** Outer Circle STARKs (unitary, Born, trajectory, AggregationAir, RecAgg) and leaf/agg PCS query slots follow this ladder. Nested FriFold / DeepRo / Mmcs **internal** uni-STARKs remain on fixed 40-query Circle/Keccak configs; only the count of outer FRI query slots varies.
+**Scope:** Outer Circle STARKs (unitary, Born, trajectory, AggregationAir, RecAgg) and leaf/agg PCS query slots follow this ladder. Nested Mmcs / FriFold **group** uni-STARKs are separate attestation proofs (Merkle path / fold equation); their FRI `num_queries` is an implementation parameter of that sub-proof, not the number of outer FRI slots the parent opened.
 
-**Why nested sub-STARKs stay at 40:** Outer `n` is the number of FRI query *slots* that PCS / RecAgg materialize (Mmcs paths, FriFold chains, DeepRo steps per query). That slot count dominates prove time and certificate size, so binding it to `security_level` is the operational lever. Each nested FriFold / DeepRo / Mmcs proof is a *separate* small uni-STARK that attests one path or fold step; its own Circle/Keccak `num_queries` is an implementation parameter of that sub-proof, not “how many outer queries the parent opened.” Keeping nested configs fixed at the ladder ceiling avoids resizing nested AIR public inputs, soft caps, and prove/verify pairing for every sub-STARK while still cutting the dominant outer work for `low` / `normal` / `high`. Making nested `num_queries` follow the ladder is intentionally out of scope.
+**Production default (nested = outer):** Nested Mmcs / FriFold group STARKs use the **same** FRI query count as the outer leaf/agg proof (`n` from `proof.query_proofs.len()`). Prove and verify pair on that count (the nested proof carries its own query vector; verify rebuilds Circle config from the nested proof). This keeps the weakest attestation link aligned with the task’s outer operational tier.
 
-**Risk of fewer outer queries:** FRI soundness error decreases as more random queries are checked; lowering `n` (e.g. `ultra` $40$ → `low` $8$) increases the chance that a malicious or buggy proof escapes detection for a given hash/FRI parameter set. In this stack the ladder is an **operational cost/throughput control**, not a claim that `low` / `normal` / `high` achieve calibrated bit-security targets. Clients and operators should treat lower tiers as accepting higher residual FRI soundness risk (and smaller / faster proofs) relative to `ultra`, and must not infer cryptographic security levels from the table above. Prove and verify must still use the same `n`; a mismatch is a hard reject, not a soft downgrade.
+**Optional size lever (`WQC_PCS_NESTED_FRI_QUERIES`):** Operators may set nested Mmcs / FriFold `num_queries` to any integer in `1..=n_outer`. Unset or out-of-range values fall back to `n_outer`. This is an **explicit shrink / experiment profile**, not a silent downgrade of `security_level`:
+
+| Profile (idle two-leaf Poseidon, illustrative) | Outer | Nested | Role |
+| --- | ---: | ---: | --- |
+| Production / `security_level` default | ladder `n` | `n` | Weakest FRI link matches the task tier |
+| E5b shrink tracking `chunk40/nested8q` | 40 | 8 | Historical size lever when nested group STARKs were on the wire |
+| E5b shrink tracking `chunk40/nested4q` | 40 | 4 | Smaller nested residual (same historical knobs) |
+
+Measured reference (Poseidon compose, `WQC_PCS_MMCS_GROUP_CHUNK=40`, host-only Mmcs/FriFold/OOD + prior merges): nested=outer ≈ 169 KiB root (`173_483` B, **PASS ≤500 KB**). Nested group STARKs are empty on this path (`mmcs_groups=0`, `fri_fold=0`, `ood=0`); siblings + digests remain on the wire. When nested group STARKs are proven, they follow `WQC_PCS_NESTED_FRI_QUERIES` (default = outer). Idle leaves currently ship `deep_ro=0` (multi-chunk quot).
+
+**Why nested is not forced to 40 forever:** Outer `n` still dominates *how many* Mmcs paths / FriFold steps PCS materializes. When nested group STARKs are on the wire, each group’s own FRI query count dominates *group_stark* bytes; lowering nested remains a soft size lever. Host-only idle Poseidon compose no longer pays that residual.
+
+**Risk of fewer queries (outer or nested):** FRI soundness error decreases as more random queries are checked. Lowering outer `n` (e.g. `ultra` $40$ → `low` $8$) or nested `n` below outer increases residual risk that a malicious or buggy *parent* proof or *attestation* sub-proof escapes detection for a given hash/FRI parameter set. In this stack both knobs are **operational cost/throughput controls**, not calibrated bit-security claims. Clients and operators must not infer cryptographic security levels from the tables above. Prove and verify must still use the same counts for each proof surface; a mismatch is a hard reject, not a soft downgrade. Do **not** ship production with nested below outer unless the deployment docs state that the nested residual is accepted independently of `security_level`.
 
 ---
 
@@ -316,7 +328,7 @@ Verifiers assert $\mathrm{SHA3\text{-}256}(\mathrm{child\_bytes}) == \mathrm{chi
 | --- | --- | --- | --- |
 | **Direct Walk** | Structural binary traversal of v3 tree. | $\mathcal{O}(N)$ | Evaluates every child leaf natively. |
 | **Digest Attestation** | `AggregationAir` (v4) tail. | $\mathcal{O}(1)$ | Asserts child digest integrity and host flags in-circuit. |
-| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) tail. | $\mathcal{O}(1)$ | Complete in-circuit verification via PCS certificates and OOD checks. |
+| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) tail. | $\mathcal{O}(1)$ | RecAgg AIR asserts child digests / `pcs_ok`; PCS openings verified at compose/root via host digest + native FriFold/OOD (optional nested group STARKs when present). |
 
 #### RecursiveAggregationAir (v6 Architecture)
 
@@ -326,7 +338,7 @@ The v6 recursive engine operates over an AIR width of 330. It validates left and
 * `1`: `AggPcsCertificate` (child aggregation node).
 * `2`: `LeafPcsBundle` (leaf node: unitary, Born, or trajectory).
 
-Certificates embed Merkle/Keccak commitments, FriFold evaluations, DeepRo trace bindings, in-circuit FRI Validation/Challenge Mmcs proofs, and `OodCheckAir` constraints.
+Certificates embed Merkle commitments, FriFold evaluations, DeepRo trace bindings (when present), Val/Challenge Mmcs openings (host digest verify by default; optional nested group STARKs), and OOD witnesses (host-native fold by default; optional `OodCheckAir` STARK).
 
 ### 8.3 Leaf PCS Workflow and Delivery Architecture
 
@@ -380,7 +392,9 @@ Default deployment profiles set `WQC_PCS_MMCS_GROUP_CHUNK` to **24** (Mmcs group
 
 ### 8.4 PCS Memory Gating Policy
 
-To prevent Out-Of-Memory (OOM) failures during the blowup-16 Keccak Mmcs phase, core evaluates peak RAM usage prior to leaf/aggregation PCS prove when `WQC_MAX_MEMORY_GB` is set. When unset, the memory gate is **disabled** (no refuse/spill enforcement).
+To prevent Out-Of-Memory (OOM) failures during leaf/aggregation PCS build, core evaluates peak RAM usage prior to prove when `WQC_MAX_MEMORY_GB` is set. When unset, the memory gate is **disabled** (no refuse/spill enforcement).
+
+**Host-only PCS (production):** nested Mmcs / FriFold / OOD group STARKs are empty; the estimate is dominated by proof decode, sibling buffers, and native digest/fold checks (typically well under a 2 GiB devnet budget at 40q). The historical blowup-16 Keccak group-prove matrix is no longer the dominant term.
 
 When the gate is active and estimated RAM exceeds the budget, `WQC_PCS_MEMORY_POLICY` governs execution:
 
@@ -459,8 +473,8 @@ The WQC proof engine implements a scalable D-PoUW framework. By shifting proving
 
 Key research and optimization priorities include:
 
-1. **Proof Footprint Reduction:** Shrinking recursive proof artifacts (currently $\approx 16\text{ MiB}$ for two-leaf composed roots) via Poseidon2 recursion-friendly hashes within Mmcs folding circuits.
-2. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction and expanding multi-chunk leaf DeepRo structures. The `security_level` → FRI query ladder (§5.1) now covers Born / trajectory STARKs and variable-length leaf PCS / RecAgg certificates (nested FriFold/DeepRo/Mmcs internals remain 40-query configs).
+1. **Proof Footprint Reduction:** Idle two-leaf Poseidon compose roots are ≈ **169 KiB** (`173_483` B) under the ≤500 KB pre-wrap gate (host-only Mmcs/FriFold/OOD + Poseidon2 ValMmcs). Keccak-era documented baseline remains ≈ **10.2 MiB**.
+2. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction and expanding multi-chunk leaf DeepRo structures. The `security_level` → FRI query ladder (§5.1) covers Born / trajectory STARKs and variable-length leaf PCS / RecAgg certificates. Nested Mmcs / FriFold group STARKs default to the outer query count when proven; idle Poseidon host-only paths leave them empty (§5.1).
 3. **Extended Zero-Knowledge Limits:** Expanding Born and trajectory zero-knowledge AIR capacity beyond current 16-qubit streaming bounds.
 4. **Noise-Aware STARK Constraints:** Formally incorporating stochastic physical noise models (e.g., depolarizing channels and readout error operators) directly into the transition AIR.
 
