@@ -189,10 +189,10 @@ Client `security_level` already drives quorum (`required_votes`) and bid policy.
 | Profile (idle two-leaf Poseidon, illustrative) | Outer | Nested | Role |
 | --- | ---: | ---: | --- |
 | Production / `security_level` default | ladder `n` | `n` | Weakest FRI link matches the task tier |
-| E5b shrink tracking `chunk40/nested8q` | 40 | 8 | Historical size lever when nested group STARKs were on the wire |
-| E5b shrink tracking `chunk40/nested4q` | 40 | 4 | Smaller nested residual (same historical knobs) |
+| Shrink tracking `chunk40/nested8q` | 40 | 8 | Historical size lever when nested group STARKs were on the wire |
+| Shrink tracking `chunk40/nested4q` | 40 | 4 | Smaller nested residual (same historical knobs) |
 
-Measured reference (Poseidon compose, `WQC_PCS_MMCS_GROUP_CHUNK=40`, host-only Mmcs/FriFold/OOD + prior merges): nested=outer ≈ 169 KiB root (`173_483` B). **E5b-1b signed off (2026-09-04):** this profile meets the ≤500 KB pre-wrap shrink gate (`wqc-contracts` `on-chain_settlement_scope.md` §7). Nested group STARKs are empty on this path (`mmcs_groups=0`, `fri_fold=0`, `ood=0`); siblings + digests remain on the wire. When nested group STARKs are proven, they follow `WQC_PCS_NESTED_FRI_QUERIES` (default = outer). Idle leaves currently ship `deep_ro=0` (multi-chunk quot).
+Measured reference (Poseidon compose, `WQC_PCS_MMCS_GROUP_CHUNK=40`, host-only Mmcs/FriFold/OOD + prior merges): nested=outer ≈ 169 KiB root (`173_483` B). **Pre-wrap size KPI signed off (2026-09-04):** this profile meets the ≤500 KB idle two-leaf gate (see `wqc-contracts` `on-chain_settlement_scope.md` §7). Nested group STARKs are empty on this path (`mmcs_groups=0`, `fri_fold=0`, `ood=0`); siblings + digests remain on the wire. When nested group STARKs are proven, they follow `WQC_PCS_NESTED_FRI_QUERIES` (default = outer). Idle leaves currently ship `deep_ro=0` (multi-chunk quot).
 
 **Why nested is not forced to 40 forever:** Outer `n` still dominates *how many* Mmcs paths / FriFold steps PCS materializes. When nested group STARKs are on the wire, each group’s own FRI query count dominates *group_stark* bytes; lowering nested remains a soft size lever. Host-only idle Poseidon compose no longer pays that residual.
 
@@ -473,10 +473,11 @@ The WQC proof engine implements a scalable D-PoUW framework. By shifting proving
 
 Key research and optimization priorities include:
 
-1. **Proof Footprint Reduction (E5b-1b signed off):** Idle two-leaf Poseidon compose roots are ≈ **169 KiB** (`173_483` B) under the ≤500 KB pre-wrap gate (host-only Mmcs/FriFold/OOD + Poseidon2 ValMmcs). Keccak-era documented baseline remains ≈ **10.2 MiB**. Next E5b step is SNARK wrap (E5b-2a).
-2. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction and expanding multi-chunk leaf DeepRo structures. The `security_level` → FRI query ladder (§5.1) covers Born / trajectory STARKs and variable-length leaf PCS / RecAgg certificates. Nested Mmcs / FriFold group STARKs default to the outer query count when proven; idle Poseidon host-only paths leave them empty (§5.1).
-3. **Extended Zero-Knowledge Limits:** Expanding Born and trajectory zero-knowledge AIR capacity beyond current 16-qubit streaming bounds.
-4. **Noise-Aware STARK Constraints:** Formally incorporating stochastic physical noise models (e.g., depolarizing channels and readout error operators) directly into the transition AIR.
+1. **Proof Footprint Reduction (pre-wrap size KPI signed off):** Idle two-leaf Poseidon compose roots are ≈ **169 KiB** (`173_483` B) under the ≤500 KB pre-wrap gate (host-only Mmcs/FriFold/OOD + Poseidon2 ValMmcs). Keccak-era documented baseline remains ≈ **10.2 MiB**.
+2. **SNARK wrap of $\pi_{\text{Root}}$ (thicken in progress):** Thin settle/RecAgg Groth16 toolchain is done (E5b-2a–2c; E5b-2d thin size/gas/latency locks in `wqc-contracts` §7.5). L2 `ThinWrapVerifier`, `SettlementV2.finalizeWithProof`, and orch wrap enqueue are wired. Remaining work: thicken the circuit toward bit-for-bit parity with `verify_root_proof`, then audit + target-L2 gas remeasure for the full wrap gate (`on-chain_settlement_scope.md` §7.1–§7.3). Thin wrap is not full on-L2 root validity.
+3. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction and expanding multi-chunk leaf DeepRo structures. The `security_level` → FRI query ladder (§5.1) covers Born / trajectory STARKs and variable-length leaf PCS / RecAgg certificates. Nested Mmcs / FriFold group STARKs default to the outer query count when proven; idle Poseidon host-only paths leave them empty (§5.1).
+4. **Extended Zero-Knowledge Limits:** Expanding Born and trajectory zero-knowledge AIR capacity beyond current 16-qubit streaming bounds.
+5. **Noise-Aware STARK Constraints:** Formally incorporating stochastic physical noise models (e.g., depolarizing channels and readout error operators) directly into the transition AIR.
 
 ---
 
