@@ -89,15 +89,17 @@ The greatest advantage of this mathematical decomposition is that **Worker Nodes
 
 WQC eliminates the power waste of nondeterministic hash brute force entirely. **The process of executing quantum simulation (tensor contraction) and cryptographically proving its validity** becomes the network's security anchor (PoUW).
 
-Worker Node $n$ receives tasks not governed by luck but **deterministic** incentive rewards $R$ proportional to computational complexity and the cost of generating the zk-STARK proof $\pi$ that guarantees it. This reward model is strictly defined as:
+Worker Node $n$ receives tasks not governed by luck but **deterministic** incentive rewards proportional to computational complexity and the cost of generating the zk-STARK proof $\pi$ that guarantees it. Client payment and worker receipt are related but not identical:
 
-$$R = \text{Gas}_{\text{quantum}}(C, \pi) \times \text{BaseFee}$$
+$$\text{Total Fee (Planck)} = \text{Gas}_{\text{quantum}}(C, \pi) \times \text{BaseFee} \times 10^{9}$$
 
 Where:
 
-* $R$: Total \$WQC token reward received by the Worker Node.
-* $\text{Gas}_{\text{quantum}}(C, \pi)$: Endogenous **quantum gas** consumption integrating memory and compute cost of contracting circuit $C$, plus algebraic cost (NTT, etc.) of generating zk-STARK proof $\pi$.
-* $\text{BaseFee}$: Gas unit price dynamically set by network-wide supply–demand (algorithmic control).
+* $\text{Gas}_{\text{quantum}}(C, \pi)$: Endogenous **quantum gas** (dimensionless gas units) integrating memory and compute cost of contracting circuit $C$, plus algebraic cost (NTT, etc.) of generating zk-STARK proof $\pi$.
+* $\text{BaseFee}$: Gas unit price in **Shannon per gas** ($10^{-9}$ \$WQC / gas), set by network-wide supply–demand. The factor $10^{9}$ converts Shannon→Planck so settlement math stays in Planck integers (§4.2).
+* $\text{Total Fee}$: What the client pays for the task (before escrow refunds of unused headroom).
+
+Of each settled $\text{Total Fee}$, **20% is burned** and the remaining **~80%** is the worker reward budget $R_{\text{net}}$ (further split across compute / PCS roles in the normative economics spec). Tokenomics detail: §4.2–§4.3.
 
 ASIC resistance in the WQC network—preventing governance oligopoly by giant specialized miners—is permanently enforced not by artificial memory-hard functions but by two **endogenous hardware barriers**:
 
@@ -175,12 +177,12 @@ Distributed networks, however, cannot satisfy this requirement straightforwardly
 
 #### 3.4.1 Polymorphic Output Modes
 
-What constitutes the result of a quantum circuit computation differs entirely depending on the algorithm's purpose. VQE requires the **expectation value of a Hamiltonian**, QAOA is decided by the **frequency of measured bit strings**, while for D-PoUW mining the minimum verification unit is a **single complex probability amplitude** at a specific register.
+What constitutes the result of a quantum circuit computation differs entirely depending on the algorithm's purpose. VQE requires the **expectation value of a Hamiltonian**, QAOA is decided by the **frequency of measured bit strings**, while amplitude-focused workloads need a **single complex probability amplitude** at a specific register.
 
-Rather than forcibly stuffing these into a single data format, WQC provides three output modes optimized for each use case.
+Rather than forcibly stuffing these into a single data format, WQC provides three output modes optimized for each use case. Each mode produces its own **leaf STARK** (and optional auxiliaries); `statevector_scalar` is the lightest path, not the only leaf type.
 
-* **Statevector Scalar Mode (`statevector_scalar`)**: Pinpoint-contracts the complex probability amplitude corresponding to a specific register (e.g., $|0\rangle^{\otimes n}$). As the minimal unit for zk-STARK leaf proofs, it enables the lightest and fastest verification.
-* **Measurement Sampling Mode (`sample_counts`)**: Performs deterministic pseudorandom sampling for a specified number of trials (`shots`) on measurement gates, generating bit-string occurrence frequencies (histograms). By chaining the seed value, different nodes agree on an identical histogram.
+* **Statevector Scalar Mode (`statevector_scalar`)**: Pinpoint-contracts the complex probability amplitude corresponding to a specific register (e.g., $|0\rangle^{\otimes n}$). The lightest leaf prove/verify path—no Born / histogram auxiliary.
+* **Measurement Sampling Mode (`sample_counts`)**: Performs deterministic pseudorandom sampling for a specified number of trials (`shots`) on measurement gates, generating bit-string occurrence frequencies (histograms). By chaining the seed value, different nodes agree on an identical histogram. Leaf proofs include Born-rule binding (`DistributionAir`).
 * **Observable Expectation Mode (`expectation`)**: For a Hamiltonian expressed as a linear combination of Pauli operators, algebraically computes the expectation value directly from the post-contraction state vector. Because this is not shot-based statistical estimation, consistent results are obtained across nodes even in a distributed environment.
 
 #### 3.4.2 Measurement-Preserving and Observable-Preserving Slicing
@@ -226,7 +228,7 @@ Two wrap depths are distinguished:
 * **Thin wrap** — settle-aligned public inputs and RecAgg header bindings. Suitable for private rehearsal and KPI locks; it does **not** claim bit-for-bit equivalence with off-chain `verify_root_proof` (host-only PCS payloads are not fully re-checked in-circuit).
 * **Thick wrap** — Plonky3 verifier gadgets in-circuit, thickened toward equivalence with `verify_root_proof`, after which mainnet can treat on-chain finalize as full root validity.
 
-Phase 3 may still rehearse **optimistic settlement** (commit root/receipt hashes, challenge window, dispute via off-chain STARK verify) while the wrap track matures. Mainnet validity finality is defined by the SNARK-wrap path, not by optimistic commit alone. Normative cryptographic detail lives in the protocol specs (`zk-STARK` for $\pi_{\text{Root}}$; `zk-SNARK` for $\pi_{\text{snark}}$).
+Phase 3 may still use **optimistic settlement** as a **rehearsal / fallback** (commit root/receipt hashes, challenge window, dispute via off-chain STARK verify) while the wrap track matures. **Mainnet validity finality** is defined by the SNARK-wrap path—thick wrap toward ≡ `verify_root_proof`—not by optimistic commit alone. Normative cryptographic detail lives in the protocol specs (`zk-STARK` for $\pi_{\text{Root}}$; `zk-SNARK` for $\pi_{\text{snark}}$).
 
 ```mermaid
 graph LR
@@ -258,7 +260,7 @@ Currency and economic value in this protocol are strictly defined and managed by
 
 ### 4.1 Supply Curve and Fair Launch Incentive Design
 
-Total \$WQC supply is fixed at **210,000,000 \$WQC** (integer form: $210,000,000 \times 10^{18}$ Planck) with **no additional issuance under any circumstances**. The protocol adopts a **Pure Fair Launch** with no pre-sale or VC pre-allocation.
+Total \$WQC supply is fixed at **210,000,000 \$WQC** (integer form: $210,000,000 \times 10^{18}$ Planck) with **no additional issuance under any circumstances**. The protocol adopts a **Pure Fair Launch** with no pre-sale or VC allocation.
 
 To secure initial contributors and sustained ecosystem development, total supply is strictly allocated and locked by smart contract at the following ratios:
 
@@ -294,9 +296,11 @@ $$\text{Gas}_{\text{quantum}}(C, \pi) = \alpha \cdot \text{VRAM}_{\text{peak}}(C
 
 Here $\text{SampleCost}$ is a cost term for measurement post-processing and histogram aggregation when `output_mode` is `sample_counts` or `expectation`. For `statevector_scalar` only tasks, $\delta = 0$.
 
-The transaction fee clients actually pay ($\text{Total Fee}$) multiplies this gas by dynamically varying gas unit price $\text{BaseFee}$ (unit: Shannon / Gas) according to network congestion:
+The transaction fee clients actually pay ($\text{Total Fee}$) multiplies this gas by dynamically varying gas unit price $\text{BaseFee}$ according to network congestion:
 
-$$\text{Total Fee (in Planck)} = \text{Gas}_{\text{quantum}}(C, \pi) \times \text{BaseFee} \times 10^{9}$$
+$$\text{Total Fee (Planck)} = \text{Gas}_{\text{quantum}}(C, \pi) \times \text{BaseFee} \times 10^{9}$$
+
+**Units:** $\text{BaseFee}$ is quoted in **Shannon / gas** ($1\,\text{Shannon} = 10^{-9}\,\text{\$WQC} = 10^{9}\,\text{Planck}$). Multiplying by $10^{9}$ yields Planck integers—the only unit used in ledger and on-chain settlement. Example: $\text{Gas}=1$, $\text{BaseFee}=1$ Shannon/gas ⇒ $\text{Total Fee}=10^{9}$ Planck $=1$ Shannon. This is the same $\text{Total Fee}$ introduced in §3.2; worker net receipt after burn is §4.3.
 
 When the global pending task queue exceeds a threshold, $\text{BaseFee}$ rises automatically to encourage node entry (supply increase). When demand falls, $\text{BaseFee}$ converges to a floor, offering clients low-cost computation. All multiplication and addition in orchestrator internals and on-chain use arbitrary-precision integers (Go `big.Int`, Rust `U256`, etc.)—**not a single Planck of rounding error**.
 
@@ -304,7 +308,7 @@ When the global pending task queue exceeds a threshold, $\text{BaseFee}$ rises a
 
 To provide permanent deflationary pressure (upward price pressure) on the WQC ecosystem, **20% of total fees ($\text{Total Fee}$) paid by clients is immediately sent to a burn address by smart contract at settlement and permanently destroyed (burned)**.
 
-Net reward $R_{\text{net}}$ received by Worker Node $n$ is enforced by integer arithmetic:
+Net worker budget $R_{\text{net}}$ (the ~80% of $\text{Total Fee}$ after burn; not the same symbol as client $\text{Total Fee}$ in §3.2) is enforced by integer arithmetic:
 
 $$R_{\text{net}} = \lfloor \text{Total Fee} \times 80 \div 100 \rfloor$$
 
@@ -349,9 +353,9 @@ Establishing single-node simulation engine and minimal end-to-end protocol pipel
 * **End-to-End Vertical Slice**: Connected Orchestrator, Worker Node, and Core; demonstrated pipeline from client submission through node compute to result aggregation.
 * **Deterministic PoUW Prototype**: Abolished meaningless hash mining; confirmed "quantum circuit simulation + zk-STARK proof generation" operates as designed in a closed environment.
 
-### 5.2 Phase 2: Scaling & Swarm Distribution — **In Development**
+### 5.2 Phase 2: Scaling & Swarm Distribution — **devnet Complete, Public Testnet Pending**
 
-Building the skeleton of a planetary Swarm on **libp2p**, connecting bidding, slice partitioning, verification, and off-chain economics.
+Building the skeleton of a planetary Swarm on **libp2p**, connecting bidding, slice partitioning, verification, and off-chain economics. **devnet e2e for the items below is complete**; Phase 2 closes when the **Public Testnet** (§5.2.2) is live.
 
 #### 5.2.1 devnet PoC Status
 
@@ -377,8 +381,8 @@ As the culmination of Phase 2, a **Public Testnet**—an open verification envir
 Following sufficient operational track record and security audits on the Public Testnet, the protocol transitions to the production environment (Mainnet), achieving full societal implementation of the tokenomics.
 
 * **Atomic on-chain settlement**: End the provisional Redis-based operation of the testnet; deploy complete on-chain settlement on L2 smart contracts. After an economics receipt, one settlement action pays Workers, burns 20%, and refunds unused escrow. Genuine \$WQC with real value and the Foundation's 5-year linear lock-up (vesting) contract are activated on-chain.
-* **Optimistic path (rehearsal)**: Root and receipt commitments may be recorded with a challenge window while full in-EVM verification of $\pi_{\text{Root}}$ remains deferred for artifact size. Disputes re-verify off-chain with the STARK verifier.
-* **SNARK-wrap validity path (mainnet gate)**: A wrap prover reduces $\pi_{\text{Root}}$ to $\pi_{\text{snark}}$ (Groth16 / BN254). L2 `finalizeWithProof` verifies the wrap, then executes the same pay / burn / refund. Thin wrap is the intermediate statement; thick wrap toward ≡ `verify_root_proof` is the soundness target for mainnet validity (§3.5).
+* **SNARK-wrap validity path (mainnet gate)**: A wrap prover reduces $\pi_{\text{Root}}$ to $\pi_{\text{snark}}$ (Groth16 / BN254). L2 `finalizeWithProof` verifies the wrap, then executes the same pay / burn / refund. Thin wrap is an intermediate statement for rehearsal and KPI locks; **thick wrap toward ≡ `verify_root_proof` is the soundness gate for mainnet validity** (§3.5).
+* **Optimistic path (rehearsal / fallback only)**: Commit root and receipt hashes with a challenge window and off-chain STARK dispute. Useful for private L2 rehearsal and as an operational fallback while the wrap gate matures—**not** a substitute for the SNARK-wrap mainnet soundness claim.
 * **Stable Operation Beyond 50 Qubits**: Optimize the Swarm power of globally distributed wideband nodes to stably accept and process universal quantum circuit simulations exceeding 50 qubits—beyond the limits of a single superclass supercomputer—as commercial and scientific tasks.
 
 ### 5.4 Post-Mainnet Evolution: Full Sovereignty and Hardware Integration
@@ -392,24 +396,14 @@ After mainnet launch, once 50-qubit-class simulation is established as distribut
 
 ## 6. Conclusion: We are the Computer.
 
-The World Quantum Computer (WQC) protocol does not aim merely to replace existing supercomputers or quantum computers. It is a **cryptoeconomic paradigm shift** to destroy the monopoly structure of computational resources distorted by wealth and power—and return the freedom of scientific inquiry to everyone's hands.
+WQC is a **cryptoeconomic** answer to quantum-compute oligopoly: open the work, not the fridge.
 
-Humanity has long paid the price of **convenience** from technological progress with dependence on giant platform gatekeepers and the censorship that follows. That even "next-generation compute power" essential to new drug development, understanding the cosmos, and designing cryptography that secures society is being privatized by a small privileged class is the greatest bottleneck to the evolution of human intelligence.
+1. **Physical limits** — tensor-network slicing turns Earth's idle GPUs/SoCs into one asynchronous grid.
+2. **Useful proofs** — zk-STARK D-PoUW for leaves and RecAgg roots; **SNARK wrap** for L2 gas (§3.5).
+3. **Practical outputs** — scalar, sampling, and expectation as first-class modes with deterministic PRNG / Born binding.
+4. **Fair launch** — fixed supply, no pre-sale or VC allocation; 20% fee burn; rewards only for attested work.
 
-WQC rebels against this centralized hegemony with the force of mathematics and economic rationality.
-
-1. **Overcoming Physical Limits**:
-   Abandon the dogma of building one colossal machine; unify Earth's dormant devices into one nervous system through tensor network slicing.
-2. **Practical Quantum Execution Model**:
-   Go beyond single-amplitude computation; natively support measurement, sampling (`MEASURE` / `shots` / `counts`), and Pauli expectation values as first-class outputs. Guarantee the cryptographic validity of sampling results in a distributed environment via deterministic PRNG binding and Born rule zero-knowledge proofs.
-3. **End of Wasted Energy**:
-   End the era of nondeterministic hash mining that erodes the planet; convert cryptographic zk-STARK proof generation itself into **Deterministic Proof of Useful Work (D-PoUW)**, and settle on-chain via a succinct **SNARK wrap** of the root STARK so L2 verification stays within gas limits.
-4. **Embodiment of Complete Fairness**:
-   Enforce by code a Pure Fair Launch with no pre-sale or VC allocation; distribute sovereignty and rewards only to pure contributors to the network.
-
-WQC is neither a "product" owned by some corporation nor "infrastructure" managed by a particular state. It is humanity's first **open-source intelligence at planetary scale with no centralized master**.
-
-The era of paying high fees to "own" computers from the outside is over. People worldwide connect their hardware to the protocol, share compute power, and drive the network autonomously. At that moment, the participants of the network themselves become the world's largest computer.
+WQC is not a corporate product or a state utility. It is open-source intelligence at planetary scale with no centralized master. People connect hardware, share compute, and **become** the computer.
 
 > **"We are the Computer."**
 > (We do not own the computer. We **are** the computer.)
