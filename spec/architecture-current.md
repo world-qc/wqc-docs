@@ -5,7 +5,7 @@
 - **Verified:** 2026-08-19
 - **Verified against:** `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
-- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
+- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md)
 
 > This document describes the **current** WQC stack as implemented: a single orchestrator,
 > a permissionless worker swarm, a remote composer that seals a root STARK, and optional
@@ -297,4 +297,4 @@ Dev and reference compose files may co-locate more of this on one machine. A sta
 - [`zk-STARK.md`](zk-STARK.md) — proof transcripts, AIR, leaf PCS, recursive aggregation
 - [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap of $\pi_{\text{Root}}$ for L2 settle
 - [`../examples/E2E.md`](../examples/E2E.md) — submit/poll, status machine, manifest shape for a reference stack
-- [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md) — product and economics narrative. The live phase is the centralized orchestrator + libp2p swarm; later DHT / on-chain sections are roadmap, not this diagram
+- [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md) — product and economics narrative. The live phase is the centralized orchestrator + libp2p swarm; later DHT / on-chain sections are roadmap, not this diagram

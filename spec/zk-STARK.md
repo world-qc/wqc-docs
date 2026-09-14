@@ -657,7 +657,7 @@ Selector index for gate id $g$: $1..=6 \to g-1$; CNOT ($7$) $\to 6$; CZ ($8$) $\
 
 ## References
 
-1. World Quantum Computer Whitepaper v0.3, §3.3–3.4 — Recursive Aggregation and Polymorphic Outputs.
+1. World Quantum Computer Whitepaper v0.4, §3.3–3.5 — Recursive Aggregation, Polymorphic Outputs, and SNARK Wrap.
 2. Polygon Plonky3 Architecture — Uni-STARK Engine, Circle PCS, and FRI over Mersenne31.
 3. Eli Ben-Sasson, Iddo Bentov, Ynon Horesh, and Michael Riabzev. *Scalable, transparent, and post-quantum secure computational integrity* (STARK Foundations).
 4. WQC [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap of $\pi_{\text{Root}}$ for L2 settlement.

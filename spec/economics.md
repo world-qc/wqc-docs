@@ -3,7 +3,7 @@
 - **Status:** Draft
 - **Tier:** A (canonical protocol spec)
 - **Audience:** Protocol designers, contract authors, and implementers who need the normative fee and settlement rules
-- **Related:** [`architecture.md`](architecture.md), [`architecture-current.md`](architecture-current.md), [`zk-SNARK.md`](zk-SNARK.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
+- **Related:** [`architecture.md`](architecture.md), [`architecture-current.md`](architecture-current.md), [`zk-SNARK.md`](zk-SNARK.md), [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md)
 
 This document is the **normative** economics specification: units, gas, reward splits, escrow, economics receipts, and on-chain settlement. It does not define Redis keys, environment variables, or HTTP paths — those live in [`architecture-current.md`](architecture-current.md) §4.
 
@@ -162,4 +162,4 @@ TotalFee ≈ 1.174 WQC
 - [`architecture.md`](architecture.md) §6–8 — trust, settlement contract, migration
 - [`architecture-current.md`](architecture-current.md) §4 — live Redis / env / HTTP / receipt wiring
 - [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap for on-chain validity finalize
-- [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md) §4 — supply, burn narrative, vesting
+- [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md) §4 — supply, burn narrative, vesting
