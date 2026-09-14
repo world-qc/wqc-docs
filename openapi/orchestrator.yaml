@@ -37,9 +37,9 @@ tags:
   - name: Economy
     description: Off-chain Redis ledger quotes and balances
   - name: Payout
-    description: Operator EVM payout registry (E5a)
+    description: Operator EVM payout registry (optimistic settlement)
   - name: Settlement
-    description: On-chain lockEscrow / settle / finalize (E5a)
+    description: On-chain lockEscrow / settle / finalize (optimistic settlement)
 
 paths:
   /api/v1/submit:
