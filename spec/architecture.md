@@ -3,7 +3,7 @@
 - **Status:** Draft
 - **Tier:** A (canonical protocol spec)
 - **Audience:** Protocol designers, researchers, and readers who need a specification of the finished system before it is fully built
-- **Related:** [`architecture-current.md`](architecture-current.md) (current implementation), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
+- **Related:** [`architecture-current.md`](architecture-current.md) (current implementation), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
 
 ## Abstract
 
@@ -41,6 +41,7 @@ The target architecture defines:
 ### 1.2 What it does not specify
 
 - The zk-STARK transcript, AIR constraints, and recursion internals — specified in [`zk-STARK.md`](zk-STARK.md).
+- The SNARK wrap of $\pi_{\text{Root}}$ for on-chain validity — specified in [`zk-SNARK.md`](zk-SNARK.md).
 - The current implementation layout — specified in [`architecture-current.md`](architecture-current.md).
 - The narrative vision, tokenomics math, and marketing framing — the [`whitepaper`](../whitepaper/WHITEPAPER_0.3_en.md). Fee/settlement norms — [`economics.md`](economics.md).
 
@@ -96,8 +97,10 @@ flowchart TB
   pair that contracts slices and produces leaf STARK proofs. QPU providers may attach as
   specialized compute in a later phase.
 - **Verification and settlement** are the security base of the network: recursive proofs are
-  aggregated into a single root proof that is verified on-chain, where rewards and
-  penalties are applied atomically.
+  aggregated into a single root STARK $\pi_{\text{Root}}$. On-chain finality verifies a
+  **succinct SNARK wrap** $\pi_{\text{snark}}$ of that root (or, during Phase 3 rehearsal,
+  an optimistic commitment with an off-chain challenge path). Rewards and penalties apply
+  atomically with settlement.
 
 ---
 
@@ -108,8 +111,9 @@ flowchart TB
 | **Client** | Submits tasks, escrows funds, polls status, receives final manifest | None. Results are self-verifiable via the root proof |
 | **Orchestrator** | Routes tasks, issues slices, coordinates quorum, initiates disputes | Honest majority among orchestrators; a client must not need to trust any single one |
 | **Miner (node + core)** | Bids on work, computes slices, produces leaf proofs, optionally builds leaf PCS | None. A dishonest miner can only lose its stake |
-| **Aggregator (composer)** | Fetches leaf artifacts, builds the recursive composition tree, emits the root proof | None. Aggregation is checkable by any verifier |
-| **On-chain verifier** | Verifies the root proof and executes settlement (rewards, burns, refunds) | The chain itself. Verification input is minimal: one proof, one commitment |
+| **Aggregator (composer)** | Fetches leaf artifacts, builds the recursive composition tree, emits the root STARK | None. Aggregation is checkable by any verifier |
+| **Wrap prover** | Produces a SNARK wrap $\pi_{\text{snark}}$ of $\pi_{\text{Root}}$ for L2 gas limits | None. Wrap soundness is cryptographic; thin wrap is not full host-PCS parity |
+| **On-chain verifier** | Verifies $\pi_{\text{snark}}$ (Groth16) and executes settlement (rewards, burns, refunds) | The chain itself. Input is the wrap proof plus settle-aligned public inputs |
 | **QPU provider** | Supplies physical-qubit execution for slices that require it (extension) | None; output still bound into the same proof pipeline |
 
 Roles may overlap. In particular, a miner may also serve as an aggregator, and an
@@ -139,9 +143,10 @@ subset of the following adversaries exist:
   to *high-stakes* work is gated by stake, not by identity whitelists.
 - **Censorship resistance.** No single orchestrator can prevent a task from being routed,
   executed, or verified. A stalled task can be taken over by other orchestrators.
-- **Finality.** Settlement is a single on-chain transaction: the root proof either verifies
-  and pays, or fails and refunds/penalizes. There is no off-chain "pending" that can be
-  walked back.
+- **Finality.** Settlement is a single on-chain transaction family: after escrow lock and
+  settle, finalize either (a) accepts a verifying SNARK wrap and pays, or (b) on the
+  optimistic path, expires the challenge window without a successful dispute. There is no
+  off-chain "pending" that can be walked back after finalize.
 - **Result integrity.** The manifest binds circuit, public inputs, slice set, and
   result hash. Any deviation is detected by any verifier with access to the proof.
 - **Sybil resistance.** Influence over task routing and quorum selection is weighted by
@@ -164,22 +169,24 @@ orchestrator rotation instead of a fixed coordinator.
 ```mermaid
 sequenceDiagram
   participant C as Client
-  participant O as Orchestrators (DHT)
+  participant O as Orchestrators_DHT
   participant N as Miners
   participant A as Aggregator
-  participant V as On-chain verifier
+  participant W as Wrap_prover
+  participant V as On_chain_verifier
 
   C->>O: submit task + escrow
   O->>O: agree routing + quorum set
-  O->>N: dispatch slices (signed)
-  N->>O: leaf proofs (+ PCS)
+  O->>N: dispatch slices signed
+  N->>O: leaf proofs + PCS
   O->>N: open call if PCS missing
   O->>A: enqueue compose
-  A->>V: root proof + manifest commitment
-  V->>V: verify root proof on-chain
+  A->>W: root STARK for wrap
+  W->>V: SNARK wrap + settle PIs
+  V->>V: verify wrap on-chain
   V-->>N: rewards / burns
   V-->>C: refund remainder + final manifest
-  C->>O: GET task/{id} (root_hash)
+  C->>O: GET task id root_hash
 ```
 
 1. **Submission.** A client submits a circuit, output mode, and parameters, and escrows
@@ -197,22 +204,24 @@ sequenceDiagram
    proof-commitment (leaf PCS) bundles are produced by a designated miner, or by open call,
    or by the aggregator as a fallback.
 6. **Aggregation.** An aggregator builds the recursive composition tree (a single leaf is
-   duplicated into a binary tree when needed) and emits the root proof. The root proof
-   commits to the entire task in one constant-size statement.
-7. **On-chain settlement.** The root proof and a manifest commitment are submitted to the
-   chain. On verification: miners are paid, the burn executes, the client receives its
+   duplicated into a binary tree when needed) and emits the root STARK $\pi_{\text{Root}}$.
+7. **SNARK wrap.** A wrap prover reduces $\pi_{\text{Root}}$ to a succinct $\pi_{\text{snark}}$
+   suitable for L2 verification ([`zk-SNARK.md`](zk-SNARK.md)).
+8. **On-chain settlement.** The wrap proof and settle-aligned public inputs are submitted to
+   the chain. On verification: miners are paid, the burn executes, the client receives its
    remainder and the final manifest. On failure: the escrow is refunded or redistributed
-   according to the fault rules (§6.3).
-8. **Verification by the client.** The client holds `root_hash` and the manifest. It can
-   re-verify the root proof with any verifier, on-chain or off, without trusting the
-   network.
+   according to the fault rules (§6.3). Phase 3 may still rehearse an **optimistic** path
+   (commit + challenge window) before the wrap gate lands.
+9. **Verification by the client.** The client holds `root_hash` and the manifest. It can
+   re-verify the root STARK off-chain, and rely on L2 for wrap verification, without trusting
+   any single operator.
 
 ---
 
 ## 6. Proof, verification, and settlement contracts
 
-This section fixes the *contracts* between layers. The cryptographic detail lives in
-[`zk-STARK.md`](zk-STARK.md).
+This section fixes the *contracts* between layers. STARK detail lives in
+[`zk-STARK.md`](zk-STARK.md); SNARK wrap detail lives in [`zk-SNARK.md`](zk-SNARK.md).
 
 ### 6.1 Proof pipeline
 
@@ -223,31 +232,38 @@ This section fixes the *contracts* between layers. The cryptographic detail live
   (open call and aggregator fallback exist). Completeness is still required for the RecAgg
   v6 fast path; missing PCS falls through to an AggregationAir audit walk, which is sound
   but not $O(1)$.
-- **Recursive aggregation** reduces any number of leaves to one **root proof** of constant
-  size. The root proof is the single artifact that crosses into the settlement layer.
+- **Recursive aggregation** reduces any number of leaves to one **root STARK** $\pi_{\text{Root}}$.
+- **SNARK wrap** reduces $\pi_{\text{Root}}$ to $\pi_{\text{snark}}$ for on-chain gas limits.
+  The wrap (not the raw multi-MiB root STARK) is the artifact the L2 verifier checks.
 
 ### 6.2 Verification contract
 
-- **Off-chain verifiers** (orchestrators, aggregators, clients) verify leaf and root proofs
+- **Off-chain verifiers** (orchestrators, aggregators, clients) verify leaf and root STARKs
   locally with the FFI verifier; verification never requires re-executing the computation.
-- **On-chain proof check** accepts only the root proof plus a small commitment
-  (`root_hash`, `manifest_digest`, `task_id`). That check is stateless: it does not
-  re-execute the circuit.
+- **On-chain proof check** (target / validity path) accepts a SNARK wrap plus settle-aligned
+  public inputs (`rootHash` = keccak256 of root.bin, receipt / payout commitments, RecAgg
+  header digests as specified in [`zk-SNARK.md`](zk-SNARK.md)). That check is a pairing
+  verifier, not a STARK verifier in EVM.
+- **Optimistic path (Phase 3 rehearsal):** the chain may store root / receipt commitments
+  without verifying $\pi_{\text{Root}}$ in EVM; disputes use off-chain `verify_root_proof`
+  during a challenge window.
 - **On-chain settlement** is separate: it reads escrow, stake, and reward accounts and
-  applies §6.3 atomically after the proof check succeeds or fails.
+  applies §6.3 atomically after the proof check succeeds or the optimistic window closes.
 
 ### 6.3 Settlement rules
 
-- **Success:** verified root proof → miners paid from escrow per work report, burn applied,
-  remainder returned to the client.
-- **Dispute:** a client or miner challenges a manifest via a root-proof re-verification.
-  Because the proof is deterministic, a challenge has a binary outcome; there is no
-  arbitration.
-- **Timeout/stall:** if a task fails to produce a verifiable root proof within the
-  grace period, the escrow is refunded to the client (minus penalties attributed to
-  provably failing miners, if any).
-- **Atomicity:** reward, burn, refund, and penalty settle in the same transaction.
-  No partial settlement is possible.
+- **Success (validity path):** verifying SNARK wrap → miners paid from escrow per work
+  report, burn applied, remainder returned to the client.
+- **Success (optimistic path):** settle commitments → challenge window elapses without a
+  successful dispute → finalize pays as above.
+- **Dispute (optimistic path):** a client or miner challenges a settled root commitment via
+  off-chain root-proof re-verification; a failed challenge forfeits the challenger bond
+  (§8). Validity finalize does not use this challenge window for soundness.
+- **Timeout/stall:** if a task fails to produce a verifiable root (and wrap, when required)
+  within the grace period, the escrow is refunded to the client (minus penalties attributed
+  to provably failing miners, if any).
+- **Atomicity:** reward, burn, refund, and penalty settle in the same finalize transaction
+  family. No partial settlement is possible.
 
 ---
 
@@ -301,8 +317,10 @@ Architecture constraints that economics must satisfy:
   (straggler draws may reduce *effective* burn below the nominal 20%).
 - **Reward distribution.** Rewards are computed from attested work reports, which are
   themselves bound into the proof pipeline, so payment cannot be inflated by an operator.
-- **Dispute economics.** Challenging a settled root commitment costs a bond that is forfeit
-  if the challenge fails (optimistic settlement path).
+- **Dispute economics.** On the optimistic settlement path, challenging a settled root
+  commitment costs a bond that is forfeit if the challenge fails. The SNARK-wrap validity
+  path relies on cryptographic verification at finalize instead of that challenge window
+  for soundness.
 
 ---
 
@@ -330,7 +348,9 @@ incremental:
 1. **Keep the proof spine.** The leaf/root proof pipeline and the manifest format do not
    change; everything built and verified today is valid input to the target system.
 2. **Decouple settlement.** Move escrow and payments from Redis ledgers to the chain while
-   keeping the single orchestrator for routing. This is the first on-chain integration.
+   keeping the single orchestrator for routing. Phase 3 ships optimistic settle first, then
+   SNARK-wrap validity finalize ([`zk-SNARK.md`](zk-SNARK.md)). This is the first on-chain
+   integration.
 3. **Decouple coordination.** Replace the fixed orchestrator with the DHT layer. Winner
    selection and quorum become stake-weighted; task state becomes replicated.
 4. **Open the swarm.** Once coordination and settlement are decentralized, the remaining
@@ -363,7 +383,8 @@ The following are explicitly deferred but reserved:
 | **D-PoUW** | Deterministic Proof of Useful Work — proving execution trace, not wasting energy |
 | **RecAgg / recursive aggregation** | Reducing many leaf proofs into one constant-size root proof |
 | **PCS** | Polynomial commitment scheme (Circle PCS). A **leaf PCS bundle** is the opening certificate used to compose a leaf in RecAgg |
-| **Leaf / root proof** | Single-slice proof / task-wide aggregated proof |
+| **Leaf / root proof** | Single-slice STARK / task-wide aggregated STARK $\pi_{\text{Root}}$ |
+| **SNARK wrap** | Groth16 (BN254) argument $\pi_{\text{snark}}$ of a statement about $\pi_{\text{Root}}$ for L2 verify |
 | **Compact-register slice** | A pruned sub-task with `qubit_count = N − C` after fixing `C` tensor legs |
 | **Manifest** | The signed artifact binding circuit, inputs, slices, and result hash |
 | **Open call** | A public bid for a proof/PCS artifact placed in CAS when designated workers refuse |
