@@ -87,7 +87,8 @@ services:
 
   wqc-s3-storage:
     container_name: wqc-s3-storage
-    image: minio/minio:latest
+    # Docker Hub minio/minio is gone; Quay still serves official images.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in examples/.env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in examples/.env}
@@ -98,20 +99,15 @@ services:
     ports:
       - "9000:9000"
       - "9090:9090"
-    entrypoint: sh
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - -c
       - |
         mkdir -p /data/wqc-results
-        /usr/bin/minio server /data --console-address ":9090" &
-        pid=$$!
-        until curl -sf http://localhost:9000/minio/health/live; do sleep 1; done
-        mc alias set local http://localhost:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
-        wait $$pid
+        exec minio server /data --console-address ":9090"
     volumes:
       - wqc-minio-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl --fail http://localhost:9000/minio/health/live || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5
