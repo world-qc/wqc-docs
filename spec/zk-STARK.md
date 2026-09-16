@@ -474,7 +474,7 @@ The WQC proof engine implements a scalable D-PoUW framework. By shifting proving
 Key research and optimization priorities include:
 
 1. **Proof Footprint Reduction (pre-wrap size KPI signed off):** Idle two-leaf Poseidon compose roots are ≈ **169 KiB** (`173_483` B) under the ≤500 KB pre-wrap gate (host-only Mmcs/FriFold/OOD + Poseidon2 ValMmcs). Keccak-era documented baseline remains ≈ **10.2 MiB**.
-2. **SNARK wrap of $\pi_{\text{Root}}$ (thicken in progress):** Thin settle/RecAgg Groth16 toolchain is done (E5b-2a–2c; E5b-2d thin size/gas/latency locks in `wqc-contracts` §7.5). L2 `ThinWrapVerifier`, `SettlementV2.finalizeWithProof`, and orch wrap enqueue are wired. Remaining work: thicken the circuit toward bit-for-bit parity with `verify_root_proof`, then audit + target-L2 gas remeasure for the full wrap gate (`on-chain_settlement_scope.md` §7.1–§7.3). Thin wrap is not full on-L2 root validity.
+2. **SNARK wrap of $\pi_{\text{Root}}$ (thick wrap track):** Normative wrap statement, thin vs thick guarantees, and on-chain finalize are specified in [`zk-SNARK.md`](zk-SNARK.md). Thin wrap toolchain and thin wrap KPI lock are done. Thick host gadgets (Mmcs / FriFold / OOD) are done; **thick wrap residual remains Partial** (`thick_fri_fs_auth_v0` N=40 + `thick_recagg_fri_fs_auth_v0` N=40 + OOD/AIR↔Auth + working N=1 `thick_unified_v0` ≤30M R1CS + leaf FriFsAuth + standalone child-verify / digest KPIs). Remaining for the wrap gate: Max→87KiB / deeper Auth / payload↔Auth, statement ≡ `verify_root_proof`, then audit + target-L2 gas (see `wqc-contracts` [`on-chain_settlement_scope.md`](https://github.com/world-qc/wqc-contracts/blob/main/docs/on-chain_settlement_scope.md) §7.2 / §7.6; internal gate track **E5b-3d** — glossary there). Thin wrap is not full on-L2 root validity.
 3. **Recursive Protocol Refinements:** Streamlining prove-time witness extraction and expanding multi-chunk leaf DeepRo structures. The `security_level` → FRI query ladder (§5.1) covers Born / trajectory STARKs and variable-length leaf PCS / RecAgg certificates. Nested Mmcs / FriFold group STARKs default to the outer query count when proven; idle Poseidon host-only paths leave them empty (§5.1).
 4. **Extended Zero-Knowledge Limits:** Expanding Born and trajectory zero-knowledge AIR capacity beyond current 16-qubit streaming bounds.
 5. **Noise-Aware STARK Constraints:** Formally incorporating stochastic physical noise models (e.g., depolarizing channels and readout error operators) directly into the transition AIR.
@@ -657,6 +657,7 @@ Selector index for gate id $g$: $1..=6 \to g-1$; CNOT ($7$) $\to 6$; CZ ($8$) $\
 
 ## References
 
-1. World Quantum Computer Whitepaper v0.3, §3.3–3.4 — Recursive Aggregation and Polymorphic Outputs.
+1. World Quantum Computer Whitepaper v0.4, §3.3–3.5 — Recursive Aggregation, Polymorphic Outputs, and SNARK Wrap.
 2. Polygon Plonky3 Architecture — Uni-STARK Engine, Circle PCS, and FRI over Mersenne31.
 3. Eli Ben-Sasson, Iddo Bentov, Ynon Horesh, and Michael Riabzev. *Scalable, transparent, and post-quantum secure computational integrity* (STARK Foundations).
+4. WQC [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap of $\pi_{\text{Root}}$ for L2 settlement.

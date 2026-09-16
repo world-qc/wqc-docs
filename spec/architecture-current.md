@@ -3,17 +3,20 @@
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-08-19
-- **Verified against:** `wqc-orchestrator@c94a447` `wqc-core@f162911` `wqc-node@9492fbd` `wqc-p2p-proxy@7898c96` `wqc-composer@ce3b3be` `wqc-stark-engine@db594b9`
+- **Verified against:** `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
-- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
+- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md)
 
 > This document describes the **current** WQC stack as implemented: a single orchestrator,
-> a permissionless worker swarm, and a remote composer that seals a root STARK.
+> a permissionless worker swarm, a remote composer that seals a root STARK, and optional
+> on-chain settle / SNARK-wrap finalize paths.
 > It is a snapshot of the system as it exists today and will be updated as the
 > implementation moves toward the target architecture. For the finished-system
 > specification, see [`architecture.md`](architecture.md).
 
-Out of scope here: DHT multi-orchestrator, on-chain settlement, physical QPU backends, and marketing-site wiring.
+Out of scope here: DHT multi-orchestrator, physical QPU backends, and marketing-site wiring.
+On-chain settlement is in scope as an **opt-in** path (devnet Anvil overlays): optimistic
+`SettlementCommit`, or thin wrap `SettlementV2` behind `WQC_SETTLE_VALIDITY_PROOF`.
 
 ---
 
@@ -26,9 +29,11 @@ Out of scope here: DHT multi-orchestrator, on-chain settlement, physical QPU bac
 | **wqc-node** | Daemon | Swarm agent: bid, receive dispatch, return leaf proof / PCS. One in-flight sub-task per process. Admin HTTP only |
 | **wqc-core** | Daemon | Per-node compute: tensor contraction, leaf STARK prove, `/leaf_pcs`. Also `POST /verify` (local/stateless). Local HTTP or Unix socket — not a library |
 | **wqc-composer** | Daemon | Redis job worker: fetch leaf artifacts from CAS, build $\pi_{\text{Root}}$, write CAS + Redis. No P2P |
+| **wqc-snark-wrap** | Daemon | Redis `wrap:jobs` worker: fetch $\pi_{\text{Root}}$ from CAS, prove Groth16 wrap, upload `proof_cas` / `public_cas` / `solidity_cas`. Used when `WQC_SETTLE_VALIDITY_PROOF=true` |
 | **wqc-stark-engine** | Repository | STARK workspace. Crate `wqc-stark-core` is linked in-process by core and composer (prove / compose / local verify); crate `wqc-stark-ffi` exposes `libwqc_stark_verifier` linked into the orchestrator for **consensus verify** |
-| **Redis** | Infra | Task meta, bids, economy ledger, compose job queue |
-| **CAS** | Infra | S3-compatible content-addressed store for leaf STARKs, leaf PCS, root proofs, manifests |
+| **wqc-contracts** | Repository | L2 Solidity: `$WQC` token, optimistic `SettlementCommit`, thin wrap `SettlementV2` + `ThinWrapVerifier` |
+| **Redis** | Infra | Task meta, bids, economy ledger, compose / wrap job queues |
+| **CAS** | Infra | S3-compatible content-addressed store for leaf STARKs, leaf PCS, root proofs, wrap artifacts, manifests |
 
 The public testnet dashboard is an HTTP client of the orchestrator. Workers never call the client API. `wqc-core` is a process, not a crate workers link. Composer is a Redis consumer, not an HTTP compose API.
 
@@ -46,8 +51,10 @@ flowchart LR
   node["wqc-node"]
   core["wqc-core"]
   composer["wqc-composer"]
+  wrap["wqc-snark-wrap"]
   redis["Redis"]
   cas["CAS"]
+  l2["L2 Settlement"]
   ffi["libwqc_stark_verifier"]
 
   client -->|"submit / status / bootstrap"| orch
@@ -58,8 +65,11 @@ flowchart LR
   orch --> ffi
   orch --> redis
   composer --> redis
+  wrap --> redis
   orch --> cas
   composer --> cas
+  wrap --> cas
+  orch -.->|"settle / finalizeWithProof"| l2
   node -.->|"presigned GET<br/>open-call proof"| cas
 ```
 
@@ -72,7 +82,8 @@ flowchart LR
 | Node ↔ core | `/compute`, `/leaf_pcs` (optional `POST /verify`) | Typically localhost |
 | Orchestrator ↔ FFI | Leaf / leaf-PCS / root verify (consensus) | In-process, no network |
 | Core / composer ↔ `wqc-stark-core` | Prove / compose / local verify | In-process, no network |
-| Orchestrator / composer ↔ Redis and CAS | State, queue, blobs | Private. Open-call leaf proofs and completed manifests use presigned GET |
+| Orchestrator / composer / wrap ↔ Redis and CAS | State, queue, blobs | Private. Open-call leaf proofs and completed manifests use presigned GET |
+| Orchestrator ↔ L2 RPC | `lockEscrow` / `settle` / `finalize` or `finalizeWithProof` | Relayer key; optimistic or thin wrap path |
 
 Results do not travel over HTTP. There is no node `/submit` and no result webhook.
 
@@ -125,7 +136,8 @@ sequenceDiagram
 5. **Quorum.** Orchestrator FFI-verifies the leaf. Scalar / expectation use epsilon match; `sample_counts` must match exactly under the orchestrator-issued seed.
 6. **Leaf PCS.** Winner is nominated to build a leaf PCS bundle. Majority refuse (memory gate) can failover, then an optional PCS open call (CAS upload + swarm bid). Exhaustion falls through to composer building missing PCS during compose. Completeness is required for the RecAgg v6 fast path; without it, compose falls through to the AggregationAir audit walk.
 7. **Compose.** Finalizer uploads leaves to CAS and enqueues a Redis compose job. Composer builds a binary composition tree (a single leaf is duplicated) and writes $\pi_{\text{Root}}$. The orchestrator has no in-process compose path; without a composer on the same Redis and bucket, tasks stall in `composing_proofs`.
-8. **Seal.** Orchestrator FFI-verifies the root, uploads root + result manifest to CAS, and the client receives `completed` with `root_hash` and a presigned `manifest_url`.
+8. **Seal.** Orchestrator FFI-verifies the root, uploads root + result manifest to CAS, and the client receives `completed` with `root_hash` and a presigned `manifest_url`. Stores `root_cas` + `wrap_root_hash` (keccak of root.bin) when on-chain settle may follow.
+9. **On-chain settle (opt-in).** With L2 env set: after the economics receipt, the relayer `settle`s. **Optimistic** path (`SettlementCommit`): challenge window then `finalize`. **Thin wrap** path (`WQC_SETTLE_VALIDITY_PROOF=true`, `SettlementV2`): enqueue `wrap:jobs` → `wqc-snark-wrap` proves Groth16 → orch `finalizeWithProof`. Spec: [`zk-SNARK.md`](zk-SNARK.md). Devnet: `world-qc-docker/devnet` `compose.e5a.yml` / `compose.e5b2.yml`.
 
 Transcript versions, public-input binding, and RecAgg are specified in [`zk-STARK.md`](zk-STARK.md). This page only names who produces and who verifies.
 
@@ -135,7 +147,8 @@ Transcript versions, public-input binding, and RecAgg are specified in [`zk-STAR
 
 Normative units, gas, splits, and on-chain settlement rules:
 [`economics.md`](economics.md). This section is how **wqc-orchestrator** implements the
-off-chain ledger today (Redis, env, HTTP, receipts). On-chain settle is not implemented yet.
+off-chain ledger today (Redis, env, HTTP, receipts). On-chain settle is opt-in via L2 env
+(optimistic or thin wrap); public testnet still uses this Redis ledger as source of truth.
 
 Billing unit = one slice + one leaf STARK. Redis may **accrue** rewards at quorum / PCS /
 straggler time; after the straggler grace, burns settle, unused escrow refunds, and an
@@ -270,7 +283,7 @@ Keep this thinner than the logical maps; hostnames and compose files go stale.
 | Plane | Typical members |
 | --- | --- |
 | Edge | TLS terminator + HTTP client (public testnet dashboard, or any API client) |
-| Control | Orchestrator + p2p-proxy on one host (shared Unix socket). Redis and composer as siblings on the same Redis and CAS |
+| Control | Orchestrator + p2p-proxy on one host (shared Unix socket). Redis, composer, and (for thin wrap) snark-wrap as siblings on the same Redis and CAS |
 | Swarm | External `wqc-node` + `wqc-core` pairs (miners). Not co-located with the control plane in public testnet |
 
 Dev and reference compose files may co-locate more of this on one machine. A stack without **wqc-composer** is not the live finalize path.
@@ -282,5 +295,6 @@ Dev and reference compose files may co-locate more of this on one machine. A sta
 - [`economics.md`](economics.md) — normative D-PoUW fees, escrow, on-chain settlement
 - [`architecture.md`](architecture.md) — target-state specification (sovereign network)
 - [`zk-STARK.md`](zk-STARK.md) — proof transcripts, AIR, leaf PCS, recursive aggregation
+- [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap of $\pi_{\text{Root}}$ for L2 settle
 - [`../examples/E2E.md`](../examples/E2E.md) — submit/poll, status machine, manifest shape for a reference stack
-- [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md) — product and economics narrative. The live phase is the centralized orchestrator + libp2p swarm; later DHT / on-chain sections are roadmap, not this diagram
+- [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md) — product and economics narrative. The live phase is the centralized orchestrator + libp2p swarm; later DHT / on-chain sections are roadmap, not this diagram

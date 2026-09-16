@@ -3,7 +3,7 @@
 - **Status:** Draft
 - **Tier:** A (canonical protocol spec)
 - **Audience:** Protocol designers, contract authors, and implementers who need the normative fee and settlement rules
-- **Related:** [`architecture.md`](architecture.md), [`architecture-current.md`](architecture-current.md), [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md)
+- **Related:** [`architecture.md`](architecture.md), [`architecture-current.md`](architecture-current.md), [`zk-SNARK.md`](zk-SNARK.md), [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md)
 
 This document is the **normative** economics specification: units, gas, reward splits, escrow, economics receipts, and on-chain settlement. It does not define Redis keys, environment variables, or HTTP paths — those live in [`architecture-current.md`](architecture-current.md) §4.
 
@@ -122,9 +122,10 @@ After finalize, an economics receipt commits to escrow locked / debited / refund
 Phase 3 keeps a **single orchestrator** for routing. Settlement moves on-chain as follows:
 
 1. **Atomic finalize.** After off-chain work and the economics receipt, one settlement transaction (or one logical settlement action) applies: verify commitment, pay recipients, burn, refund remainder. No mandatory per-slice on-chain debits.
-2. **Optimistic root commitment.** The chain stores `task_id`, `root_hash`, `manifest_digest` / receipt commitment, and the payout vector. Full in-EVM verification of $\pi_{\text{Root}}$ is **out of scope for the initial on-chain design** (current root artifacts are multi-MiB). A challenge window allows dispute via re-verification with the off-chain verifier; unresolved fraud proofs escalate per governance. Full on-chain STARK/SNARK verify is a later track (proof footprint reduction or wrapping).
-3. **Signed payout registration.** Operators bind an `0x` payout address with an Ed25519 signature before they can receive on-chain rewards.
-4. **Relayer.** Phase 3 may use the orchestrator (or a designated relayer) to submit settle transactions. Permissionless settle using the same commitments is a compatible extension.
+2. **Optimistic root commitment.** The chain stores `task_id`, `root_hash`, `manifest_digest` / receipt commitment, and the payout vector. Full in-EVM verification of $\pi_{\text{Root}}$ is **out of scope for the initial on-chain design** (current root artifacts are multi-MiB). A challenge window allows dispute via re-verification with the off-chain verifier; unresolved fraud proofs escalate per governance.
+3. **SNARK-wrap validity path.** Mainnet validity finalize verifies a succinct Groth16 wrap $\pi_{\text{snark}}$ of $\pi_{\text{Root}}$ (thin wrap as an intermediate statement; thick wrap toward ≡ `verify_root_proof`). Normative wrap protocol: [`zk-SNARK.md`](zk-SNARK.md).
+4. **Signed payout registration.** Operators bind an `0x` payout address with an Ed25519 signature before they can receive on-chain rewards.
+5. **Relayer.** Phase 3 may use the orchestrator (or a designated relayer) to submit settle transactions. Permissionless settle using the same commitments is a compatible extension.
 
 Escrow lock / client deposit UX, token contract, burn address, and challenge duration are deployment parameters; they must preserve Planck integer accounting and the 40/40/20 intent above.
 
@@ -160,4 +161,5 @@ TotalFee ≈ 1.174 WQC
 
 - [`architecture.md`](architecture.md) §6–8 — trust, settlement contract, migration
 - [`architecture-current.md`](architecture-current.md) §4 — live Redis / env / HTTP / receipt wiring
-- [`../whitepaper/WHITEPAPER_0.3_en.md`](../whitepaper/WHITEPAPER_0.3_en.md) §4 — supply, burn narrative, vesting
+- [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap for on-chain validity finalize
+- [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md) §4 — supply, burn narrative, vesting
