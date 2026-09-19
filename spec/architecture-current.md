@@ -137,7 +137,7 @@ sequenceDiagram
 6. **Leaf PCS.** Winner is nominated to build a leaf PCS bundle. Majority refuse (memory gate) can failover, then an optional PCS open call (CAS upload + swarm bid). Exhaustion falls through to composer building missing PCS during compose. Completeness is required for the RecAgg v6 fast path; without it, compose falls through to the AggregationAir audit walk.
 7. **Compose.** Finalizer uploads leaves to CAS and enqueues a Redis compose job. Composer builds a binary composition tree (a single leaf is duplicated) and writes $\pi_{\text{Root}}$. The orchestrator has no in-process compose path; without a composer on the same Redis and bucket, tasks stall in `composing_proofs`.
 8. **Seal.** Orchestrator FFI-verifies the root, uploads root + result manifest to CAS, and the client receives `completed` with `root_hash` and a presigned `manifest_url`. Stores `root_cas` + `wrap_root_hash` (keccak of root.bin) when on-chain settle may follow.
-9. **On-chain settle (opt-in).** With L2 env set: after the economics receipt, the relayer `settle`s. **Optimistic** path (`SettlementCommit`): challenge window then `finalize`. **Thin wrap** path (`WQC_SETTLE_VALIDITY_PROOF=true`, `SettlementV2`): enqueue `wrap:jobs` → `wqc-snark-wrap` proves Groth16 → orch `finalizeWithProof`. Spec: [`zk-SNARK.md`](zk-SNARK.md). Devnet: `world-qc-docker/devnet` `compose.e5a.yml` / `compose.e5b2.yml`.
+9. **On-chain settle (opt-in).** With L2 env set: after the economics receipt, the relayer `settle`s. **Optimistic** path (`SettlementCommit`): challenge window then `finalize` (contracts-only / forge — [`DeployE5a.s.sol`](https://github.com/world-qc/wqc-contracts/blob/main/script/DeployE5a.s.sol)). **Thin wrap** path (`WQC_SETTLE_VALIDITY_PROOF=true`, `SettlementV2`): enqueue `wrap:jobs` → `wqc-snark-wrap` proves Groth16 → orch `finalizeWithProof` ([`DeployE5b.s.sol`](https://github.com/world-qc/wqc-contracts/blob/main/script/DeployE5b.s.sol)). Spec: [`zk-SNARK.md`](zk-SNARK.md); settlement design: [wqc-contracts `on-chain_settlement_scope.md`](https://github.com/world-qc/wqc-contracts/blob/main/docs/on-chain_settlement_scope.md).
 
 Transcript versions, public-input binding, and RecAgg are specified in [`zk-STARK.md`](zk-STARK.md). This page only names who produces and who verifies.
 
@@ -262,7 +262,8 @@ During the grace window, `status` may be `completed` without `receipt_url` yet.
 
 ### 4.6 Ops signals
 
-Operator runbook: `world-qc-docker/testnet/RUNBOOK.md` → **Economy: faucet / settlement / burn / receipt**.
+Operator cues for faucet / settlement / burn / receipt (this section + orch logs/metrics).
+Normative economics: [`economics.md`](economics.md).
 
 | Signal | Meaning |
 | --- | --- |
