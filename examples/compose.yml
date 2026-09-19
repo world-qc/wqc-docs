@@ -1,10 +1,14 @@
-# Reference E2E stack for wqc-docs/examples (minimal subset of a full devnet layout).
+# Reference E2E stack for wqc-docs/examples (Redis economy → root seal).
+#
+# Scope: off-chain finalize only (submit → quorum → PCS → remote compose →
+# manifest). On-chain / L2 settlement (Anvil, SettlementV2, snark-wrap) is out
+# of scope — see wqc-contracts Deploy scripts and settlement scope docs.
 #
 # Layout: this file lives under wqc-docs/examples/. Build contexts assume separate
 # checkouts of sibling repos under one parent directory, for example:
 #
 #   <parent>/
-#     wqc-core/ wqc-node/ wqc-orchestrator/ wqc-p2p-proxy/ wqc-stark-engine/
+#     wqc-core/ wqc-node/ wqc-orchestrator/ wqc-composer/ wqc-p2p-proxy/ wqc-stark-engine/
 #     wqc-docs/examples/compose.yml   <-- you are here
 #
 # Quick start (from wqc-docs repo root):
@@ -154,10 +158,13 @@ services:
       WQC_BASE_FEE_MAX: "0.01"
       WQC_BASE_FEE_TARGET_QUEUE: "10"
       WQC_BASE_FEE_ADJUST_BPS: "500"
-      # PCS open call defaults on; set false to force direct orchestrator compose fallback.
+      # PCS open call defaults on; set false to skip open call and rely on
+      # remote wqc-composer leaf-PCS fallback during tree compose.
       WQC_PCS_OPEN_CALL_ENABLED: ${WQC_PCS_OPEN_CALL_ENABLED:-true}
       WQC_PCS_OPEN_CALL_TIMEOUT_SECS: ${WQC_PCS_OPEN_CALL_TIMEOUT_SECS:-1800}
       WQC_BLOB_MAX_BYTES: ${WQC_BLOB_MAX_BYTES:-33554432}
+      WQC_COMPOSER_OPERATOR_ID: ${WQC_COMPOSER_OPERATOR_ID:-composer-e2e}
+      WQC_COMPOSER_TIMEOUT_SECS: ${WQC_COMPOSER_TIMEOUT_SECS:-14400}
     networks:
       wqc-e2e:
         ipv4_address: 10.0.3.11
@@ -177,6 +184,37 @@ services:
       - wqc-orchestrator-gomod:/go/pkg/mod
       - wqc-orchestrator-gocache:/root/.cache/go-build
       - wqc-sockert:/var/run
+    depends_on:
+      wqc-redis:
+        condition: service_healthy
+      wqc-s3-storage:
+        condition: service_healthy
+      wqc-composer-01:
+        condition: service_healthy
+
+  # Remote root STARK composer (required — orch has no in-process compose path).
+  wqc-composer-01:
+    container_name: wqc-composer-01
+    build:
+      context: ../..
+      dockerfile: wqc-composer/Dockerfile
+    image: world-qc/wqc-composer:latest
+    environment:
+      RUST_LOG: info
+      WQC_COMPOSER_ID: composer-01
+      WQC_COMPOSER_HEALTH_ADDR: 0.0.0.0:9100
+      WQC_REDIS_ADDR: redis://wqc-redis:6379
+      WQC_S3_ENDPOINT: http://wqc-s3-storage:9000
+      WQC_S3_BUCKET: wqc-results
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in examples/.env}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in examples/.env}
+      AWS_REGION: auto
+      WQC_BLOB_MAX_BYTES: ${WQC_BLOB_MAX_BYTES:-33554432}
+    networks:
+      wqc-e2e:
+        ipv4_address: 10.0.3.15
+    ports:
+      - "9101:9100"
     depends_on:
       wqc-redis:
         condition: service_healthy

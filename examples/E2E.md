@@ -5,7 +5,7 @@ Submit payloads live in [`circuits/`](circuits/); runners in [`e2e/`](e2e/).
 
 This document defines a **reference E2E stack** (logical services and URLs). Bring up a stack that satisfies §2 — including the bundled [`compose.yml`](compose.yml) sample — then run the scripts from this repository.
 
-**Images:** the sample compose file builds from sibling repos checked out under one parent directory (`../../wqc-core`, `../../wqc-node`, …). Cloning only `wqc-docs` is not enough to `docker compose up` unless you already have equivalent images and retarget the compose file.
+**Images:** the sample compose file builds from sibling repos checked out under one parent directory (`../../wqc-core`, `../../wqc-node`, `../../wqc-composer`, …). Cloning only `wqc-docs` is not enough to `docker compose up` unless you already have equivalent images and retarget the compose file.
 
 ## 1. Purpose and scope
 
@@ -15,7 +15,9 @@ This document defines a **reference E2E stack** (logical services and URLs). Bri
 | `TIER=all` | 11 | + slow OP1 | Adds `multislice_28q_zz` (28q ZZ expectation, minutes) |
 | Signoff drills | E2E + 5 recovery/fault scripts | varies | §6-style rehearsal: restart, quorum stall, memory budget |
 
-Public testnet differs only in DNS, TLS, and faucet UI — the orchestrator API and manifest shape are the same.
+**In scope:** Redis client billing, swarm bid/quorum, leaf STARK, remote **wqc-composer** root seal, economics receipt on Redis/CAS. Matches public testnet’s off-chain SoT (DNS/TLS/faucet UI aside).
+
+**Out of scope:** On-chain / L2 settlement — Anvil, `SettlementCommit` / `SettlementV2`, `WQC_SETTLE_*`, snark-wrap / `finalizeWithProof`. Those live in [`wqc-contracts`](https://github.com/world-qc/wqc-contracts) (Deploy scripts + settlement scope) and optional orch L2 env; this harness does not exercise them.
 
 ## 2. Reference E2E stack
 
@@ -24,6 +26,7 @@ Minimum logical layout for the harness in this repo:
 | Component | Required capability | Default / example |
 | --- | --- | --- |
 | **Orchestrator HTTP** | `GET /health`, `POST /api/v1/submit`, `GET /api/v1/task/{id}`, `GET /api/v1/p2p/bootstrap` | `ORCH_URL=http://127.0.0.1:9001` |
+| **Composer** | Redis `compose:jobs` worker; same CAS bucket as orch | `wqc-composer-01` health `http://127.0.0.1:9101/health` |
 | **Economy store** | Redis (or equivalent) key `economy:client:{client_id}:balance` | `REDIS_HOST=127.0.0.1`, `REDIS_PORT=6379` or `REDIS_URL` |
 | **Object store** | S3-compatible bucket for manifests and proofs; presigned GET URLs on completed tasks | Host rewrite: internal hostname → reachable host (see §4) |
 | **Worker swarm** | ≥ **5** nodes online for full signoff; ≥ **3** for `security_level=ultra` quorum drills | P2P bootstrap from orchestrator |
@@ -37,12 +40,13 @@ A minimal reference stack matching the container names and ports assumed by the 
 | --- | --- |
 | `wqc-redis` | Economy store (`6379`) |
 | `wqc-s3-storage` | Object store / MinIO (`9000`, console `9090`) |
+| `wqc-composer-01` | Remote root STARK composer (`9101` → container `:9100`) |
 | `wqc-orchestrator-01` | Orchestrator HTTP (`9001` → container `:9000`) |
 | `wqc-p2p-proxy-01` | P2P hub (`4001` tcp/udp) |
 | `wqc-core-01` … `wqc-core-05` | Compute workers (shared UDS volume) |
 | `wqc-node-01` … `wqc-node-05` | Worker nodes (5 required for full signoff) |
 
-**Layout requirement:** `compose.yml` expects `wqc-docs` alongside separate checkouts of sibling repos (`wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-p2p-proxy`, `wqc-stark-engine`) under one parent directory. See the header comment in [`compose.yml`](compose.yml).
+**Layout requirement:** `compose.yml` expects `wqc-docs` alongside separate checkouts of sibling repos (`wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-composer`, `wqc-p2p-proxy`, `wqc-stark-engine`) under one parent directory. See the header comment in [`compose.yml`](compose.yml).
 
 **Secrets:** [`compose.yml`](compose.yml) does not embed credentials. Copy [`.env.example`](.env.example) to `examples/.env`, then fill values before starting the stack.
 
@@ -91,7 +95,7 @@ export COMPOSE_DIR="$PWD/examples"
 TIER=fast ./examples/e2e/run_e2e.sh
 ```
 
-Omitted from the sample (not required for examples E2E): reverse proxy, dashboards, testnet UI, Prometheus/Grafana.
+Omitted from the sample (not required for examples E2E): reverse proxy, dashboards, testnet UI, Prometheus/Grafana, Anvil / L2 settlement / snark-wrap.
 
 ### Billing and quorum
 
@@ -198,7 +202,7 @@ curl -s "$ORCH_URL/api/v1/task/$TASK_ID" | jq .
 | --- | --- |
 | `pending` | Bidding / not yet dispatched |
 | `dispatched` | Slices in flight |
-| `finalizing` | All slice quorums done; PCS wait (majority nomination → optional CAS open call → orch fallback) / compose / manifest seal (`phase`: `waiting_pcs` → `composing_proofs` → `sealing_manifest`) |
+| `finalizing` | All slice quorums done; PCS wait (majority nomination → optional CAS open call → remote composer PCS fallback) / compose / manifest seal (`phase`: `waiting_pcs` → `composing_proofs` → `sealing_manifest`) |
 | `completed` | Manifest + `proof_root_hash` available |
 | `failed` | See `error` field |
 
@@ -328,6 +332,7 @@ Record results in [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) (from [`RESUL
 | manifest URL 404 from host | rewrite internal object-store hostname or use admin `mc cat` |
 | `ASSERT [...] manifest` failed | task completed but wrong physics — see `assert_manifest.sh` |
 | stuck `pending` | orchestrator logs; economy balance; quorum / node count |
+| stuck `finalizing` / `phase=composing_proofs` | `wqc-composer-01` up and healthy (`curl -sf http://127.0.0.1:9101/health`); same Redis + bucket as orch |
 | node restart mid-task | worker `/status` → `pending_tasks` / `outbox_pending`; drill `03_node_restart.sh` |
 | orch restart mid-task | health + `/api/v1/p2p/bootstrap`; drill `04_orch_restart.sh` |
 | quorum stall (`ultra`) | too few nodes online — drill `05_fault_injection.sh` |
@@ -339,6 +344,7 @@ Record results in [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) (from [`RESUL
 2. **Presigned manifest URL** uses in-cluster DNS — rewrite hostname or fetch via object-store admin.
 3. **Orchestrator hot-reload** may leave an old binary after compile errors — verify TN cut log or restart orchestrator.
 4. **28q scalar** produces **4 slices** — allow ~180 s timeout in manifest.
+5. **No composer** → tasks stall in `composing_proofs` (orch has no in-process compose).
 
 ## 9. Last verified
 

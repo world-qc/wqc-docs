@@ -4,7 +4,9 @@ Reference submit payloads and the **E2E harness** for regression against a WQC o
 
 **Full guide:** [`E2E.md`](E2E.md) — reference stack definition, manual submit, automated runner, signoff, and triage.
 
-**Compose prerequisite:** [`compose.yml`](compose.yml) builds from separate checkouts of sibling repos (`wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-p2p-proxy`, `wqc-stark-engine`) under one parent directory. A standalone clone of `wqc-docs` alone cannot build those images — use that sibling layout, or pre-built images that satisfy the [reference E2E stack](E2E.md#2-reference-e2e-stack).
+**Scope:** Redis ledger + root STARK seal (submit → completed). **On-chain / L2 settle is out of scope** for this harness (no Anvil, SettlementV2, or snark-wrap).
+
+**Compose prerequisite:** [`compose.yml`](compose.yml) builds from separate checkouts of sibling repos (`wqc-core`, `wqc-node`, `wqc-orchestrator`, `wqc-composer`, `wqc-p2p-proxy`, `wqc-stark-engine`) under one parent directory. A standalone clone of `wqc-docs` alone cannot build those images — use that sibling layout, or pre-built images that satisfy the [reference E2E stack](E2E.md#2-reference-e2e-stack).
 
 ## Layout
 
@@ -13,7 +15,7 @@ Reference submit payloads and the **E2E harness** for regression against a WQC o
 | [`E2E.md`](E2E.md) | Human-facing E2E guide (reference stack + [`compose.yml`](compose.yml)) |
 | [`circuits/`](circuits/) | **SSOT** — all curated submit JSON (tutorial + regression) |
 | [`e2e/`](e2e/) | Runner: `manifest.tsv`, `run_e2e.sh`, `assert_manifest.sh`, `signoff/` |
-| [`compose.yml`](compose.yml) | Sample Docker Compose for the reference E2E stack |
+| [`compose.yml`](compose.yml) | Sample Docker Compose for the reference E2E stack (includes `wqc-composer`) |
 | [`scripts/redis-reseed-operator-pubkeys.sh`](scripts/redis-reseed-operator-pubkeys.sh) | Register operator pubkeys in Redis after stack start |
 
 Topic folders `basis/`, `slice/`, and `phase_c/` were merged into `circuits/` (see [`circuits/README.md`](circuits/README.md)).
