@@ -327,7 +327,7 @@ Record results in [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) (from [`RESUL
 | --- | --- |
 | submit `400` | `client_id`, `classical_bit_count`, `output_mode` in payload |
 | `status=failed` / `Compute failure` | worker logs; core image stale? |
-| `air_sum != 0` | rebuild all core workers; trace fold for `H,H` / `RX(±π/2)` |
+| `air_sum != 0` | rebuild **core + stark-engine** together; H/RX–RZ net-angle fold; RX/RY/RZ AIR (Lagrange on gate_id) |
 | TN cut picks `edge_id=e_0` first | orchestrator still on old binary — restart or fix compile |
 | manifest URL 404 from host | rewrite internal object-store hostname or use admin `mc cat` |
 | `ASSERT [...] manifest` failed | task completed but wrong physics — see `assert_manifest.sh` |
