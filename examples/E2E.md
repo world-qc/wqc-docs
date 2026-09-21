@@ -216,10 +216,14 @@ HOST_URL="${URL//wqc-s3-storage:9000/127.0.0.1:9000}"
 curl -s "$HOST_URL" | jq .
 ```
 
-If object-store admin tools are available in your stack:
+If object-store admin tools are available in your stack (preferred: host rewrite of a
+presigned URL invalidates SigV4 — host is signed). Ensure the `local` alias has
+credentials (`minio` / `minio123` on the sample/devnet stacks, or your `.env`
+`MINIO_ROOT_*`):
 
 ```bash
-docker exec wqc-s3-storage mc cat "local/wqc-results/manifests/${TASK_ID}.json" | jq .
+docker exec wqc-s3-storage sh -c \
+  'mc alias set local http://127.0.0.1:9000 minio minio123 >/dev/null && mc cat local/wqc-results/manifests/'"${TASK_ID}"'.json' | jq .
 ```
 
 Expect `result_type`, `sample_result` / `expectation_result`, `slices`, `root_hash`, and for counts tasks dominant bitstrings (e.g. Bell → `"00"` and `"11"`).
@@ -329,7 +333,7 @@ Record results in [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) (from [`RESUL
 | `status=failed` / `Compute failure` | worker logs; core image stale? |
 | `air_sum != 0` | rebuild **core + stark-engine** together; H/RX–RZ net-angle fold; RX/RY/RZ AIR (Lagrange on gate_id) |
 | TN cut picks `edge_id=e_0` first | orchestrator still on old binary — restart or fix compile |
-| manifest URL 404 from host | rewrite internal object-store hostname or use admin `mc cat` |
+| manifest URL 404 / `SignatureDoesNotMatch` from host | do not rewrite presigned host alone — use admin `mc cat` with alias credentials |
 | `ASSERT [...] manifest` failed | task completed but wrong physics — see `assert_manifest.sh` |
 | stuck `pending` | orchestrator logs; economy balance; quorum / node count |
 | stuck `finalizing` / `phase=composing_proofs` | `wqc-composer-01` up and healthy (`curl -sf http://127.0.0.1:9101/health`); same Redis + bucket as orch |
@@ -352,8 +356,9 @@ Update this section when re-running against your reference stack.
 
 | Field | Value |
 | --- | --- |
-| Date | 2026-07-14 |
-| `TIER=fast` | 10/10 `completed` + manifest assertions |
+| Date | 2026-09-21 |
+| `TIER=fast` | 10/10 `completed` + manifest assertions (incl. mid-circuit IF) |
 | `TIER=all` | 11/11 incl. slow `multislice_28q_zz` |
-| Signoff | [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) — drills PASS (logs `/tmp/wqc-signoff-20260714-210250`) |
-| Core image | `sha256:e969910473a7dab3b2400d7e6b4e1db1d46d310e2c46755c2d7937c2d8d52bb0` |
+| Signoff | [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) — drills PASS (logs `/tmp/wqc-signoff-20260921-153528`) |
+| Core image | `sha256:0df2d6f9ac09fd9e3209b7abd08ee75fb923f4c9795a3899a35fabfd746afb1b` |
+| Composer | `wqc-composer-01` healthy (`9101`) — required for root seal |

@@ -100,18 +100,22 @@ run_case() {
   fi
 
   local fetched=0
+  local s3_access="${S3_ACCESS_KEY:-${AWS_ACCESS_KEY_ID:-minio}}"
+  local s3_secret="${S3_SECRET_KEY:-${AWS_SECRET_ACCESS_KEY:-minio123}}"
   for _ in 1 2 3; do
     local manifest_url
     manifest_url="$(jq -r '.manifest_url // empty' "$poll_log" | tail -1)"
     if [[ -n "$manifest_url" ]]; then
+      # Host rewrite alone invalidates SigV4 (host is signed). Prefer container mc.
       local host_url="${manifest_url//wqc-s3-storage:9000/localhost:9000}"
       if curl -sf "$host_url" | jq -c . >"$manifest_log" 2>/dev/null && [[ -s "$manifest_log" ]]; then
         fetched=1
         break
       fi
     fi
-    if docker exec wqc-s3-storage mc cat "local/wqc-results/manifests/${task_id}.json" 2>/dev/null \
-      | jq -c . >"$manifest_log" 2>/dev/null && [[ -s "$manifest_log" ]]; then
+    if docker exec wqc-s3-storage sh -c \
+      "mc alias set local http://127.0.0.1:9000 '$s3_access' '$s3_secret' >/dev/null && mc cat local/wqc-results/manifests/${task_id}.json" \
+      2>/dev/null | jq -c . >"$manifest_log" 2>/dev/null && [[ -s "$manifest_log" ]]; then
       fetched=1
       break
     fi
