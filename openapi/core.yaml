@@ -811,3 +811,11 @@ components:
           description: |
             From `WQC_PCS_MEMORY_POLICY`. `wqc-node` requires `spill` to bid
             on PCS open calls.
+        vram_budget_bytes:
+          type: integer
+          format: int64
+          description: |
+            Present when WebGPU is active: adapter `max_buffer_size` (wgpu
+            allocation ceiling ≈ VRAM proxy, not free VRAM). `wqc-node` may
+            take `min(RAM budget, this value − reserve)` for dense bid
+            envelopes; PCS gates still use system RAM only.
