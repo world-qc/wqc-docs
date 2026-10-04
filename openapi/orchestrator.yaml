@@ -63,6 +63,9 @@ paths:
         relayer calls `lockEscrowWithPermit`. On failure Redis escrow is
         released and the request errors. Response may include
         `lock_escrow_tx_hash`.
+
+        `openqasm` is lowered to `circuit` before validation. Escrow uses the
+        lowered gate count. Preview with `POST /api/v1/qasm/translate`.
       operationId: submitTask
       requestBody:
         required: true
@@ -125,7 +128,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/SubmitResponse"
         "400":
-          $ref: "#/components/responses/ClientError"
+          description: Invalid circuit or rejected OpenQASM. No partial circuit is stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QasmErrorBody"
         "402":
           description: Insufficient Redis client balance (`WQC_CLIENT_BILLING`)
           content:
@@ -136,6 +143,56 @@ paths:
           $ref: "#/components/responses/MethodNotAllowed"
         "500":
           $ref: "#/components/responses/InternalError"
+
+  /api/v1/qasm/translate:
+    post:
+      tags: [Tasks]
+      summary: Lower linear OpenQASM to circuit JSON
+      description: |
+        Accepts an OpenQASM 2.0 or 3.0 **linear** program and returns the
+        client circuit JSON from
+        [circuit-payload.md](https://github.com/world-qc/wqc-docs/blob/main/spec/circuit-payload.md)
+        plus the declared `qubit_count` and `classical_bit_count`.
+
+        This route does **not** create a task and does **not** lock escrow.
+        `lowered_gate_count` is the length after alias expansion (`swap` is
+        three `CNOT`s, `tdg` is `Z`,`S`,`T`). Quote escrow from that count.
+
+        Fail-closed: any diagnostic returns `400` and no `circuit`. `while`,
+        `for`, `if`, `extern`, `defcal`, pulse, and gates outside the Tier A
+        set (`h` `x` `y` `z` `s` `t` `sdg` `tdg` `rx` `ry` `rz` `cx` `cz`
+        `ccx` `swap` `id` `measure` `reset`) are rejected. `include` is
+        accepted only for `stdgates.inc` and `qelib1.inc` and is never read
+        from disk. Source is capped at 256 KiB.
+      operationId: translateOpenQASM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslateRequest"
+            example:
+              source: |
+                OPENQASM 2.0;
+                include "qelib1.inc";
+                qreg q[2];
+                h q[0];
+                cx q[0], q[1];
+      responses:
+        "200":
+          description: Lowered circuit. No task was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslateResponse"
+        "400":
+          description: OpenQASM was rejected. No partial circuit is returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QasmErrorBody"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
 
   /api/v1/task/{task_id}:
     get:
@@ -808,6 +865,69 @@ components:
         error:
           type: string
 
+    QasmDiagnostic:
+      type: object
+      required: [line, column, code, message]
+      properties:
+        line:
+          type: integer
+        column:
+          type: integer
+        code:
+          type: string
+          description: |
+            Stable code. `QASM_UNSUPPORTED_FEATURE`, `QASM_UNSUPPORTED_GATE`,
+            `QASM_UNSUPPORTED_INCLUDE`, `QASM_CUSTOM_GATE`,
+            `QASM_NONCONST_PARAM`, `QASM_UNDECLARED`, `QASM_INDEX`,
+            `QASM_VERSION`, `QASM_EMPTY`, `QASM_LIMIT`, `QASM_PARSE`,
+            `QASM_CONFLICT`.
+        message:
+          type: string
+
+    QasmErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        diagnostics:
+          type: array
+          items:
+            $ref: "#/components/schemas/QasmDiagnostic"
+
+    TranslateRequest:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+          description: OpenQASM 2.0 or 3.0 source. Maximum 256 KiB.
+
+    TranslateResponse:
+      type: object
+      required: [qubit_count, classical_bit_count, circuit, lowered_gate_count, warnings]
+      properties:
+        qubit_count:
+          type: integer
+          minimum: 1
+        classical_bit_count:
+          type: integer
+          minimum: 0
+        circuit:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CircuitGate"
+        lowered_gate_count:
+          type: integer
+          minimum: 1
+          description: Length of `circuit` after alias expansion. Use this for quotes.
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/QasmDiagnostic"
+          description: Non-fatal notes such as an ignored `barrier` or a dropped `id`.
+
     SecurityLevel:
       type: string
       enum: [low, normal, high, ultra]
@@ -920,20 +1040,37 @@ components:
 
     SubmitRequest:
       type: object
-      required: [qubit_count, circuit, security_level]
+      required: [security_level]
+      description: |
+        Send `circuit` or `openqasm`, not both. When `openqasm` is set and
+        `qubit_count` or `classical_bit_count` is omitted or `0`, the
+        orchestrator fills them from the declarations. A non-zero width that
+        disagrees with the source is `400` / `QASM_CONFLICT`.
       properties:
         qubit_count:
           type: integer
-          minimum: 1
+          minimum: 0
+          description: |
+            Required for a JSON `circuit` (must be > 0). With `openqasm`, `0`
+            or omission means "use the declared width".
         classical_bit_count:
           type: integer
-          minimum: 1
-          description: Required for `sample_counts`
+          minimum: 0
+          description: |
+            Required for `sample_counts` (must be 1–16). With `openqasm`, `0`
+            or omission means "use the declared classical width".
         circuit:
           type: array
           minItems: 1
           items:
             $ref: "#/components/schemas/CircuitGate"
+          description: JSON gate list. Mutually exclusive with `openqasm`.
+        openqasm:
+          type: string
+          description: |
+            OpenQASM 2.0 / 3.0 linear subset. Lowered to `circuit` before
+            validation and escrow. Mutually exclusive with `circuit`. See
+            `POST /api/v1/qasm/translate`.
         security_level:
           $ref: "#/components/schemas/SecurityLevel"
         output_mode:
