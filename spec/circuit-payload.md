@@ -201,12 +201,20 @@ markers `stdgates.inc` and `qelib1.inc`; the file is not opened.
 | `id` / `i` | dropped |
 | `barrier` | dropped, with a warning |
 
-Angles are radians. `pi` and `+ - * /` fold at translate time. `S` is not rewritten
-as `RZ(π/2)`: core `RZ` carries a global phase that `statevector_scalar` returns.
+Angles are radians. `pi`, `+ - * /`, and OpenQASM 3 `const` names fold at
+translate time. Function calls do not. `S` is not rewritten as `RZ(π/2)`:
+core `RZ` carries a global phase that `statevector_scalar` returns.
 
-`while`, `for`, `if`, `extern`, `defcal`, pulse, custom `gate` definitions, and
-gates outside the table (`sx`, `u3`, controlled rotations, `rxx`, …) are
-rejected with no circuit. A program that lowers to an empty list is rejected.
+A `gate` or `def` whose body is straight-line (the same statements as a
+program) is inlined, including calls to other inlineable definitions.
+A `def` call may place every argument in one parenthesis list when that
+`def` appears earlier in the source; gate-style calls (`name(angles) q0, q1`)
+work in either order. `opaque`, a body that contains control flow, and a
+recursive definition are rejected as `QASM_CUSTOM_GATE`.
+
+`while`, `for`, `if`, `extern`, `defcal`, pulse, and gates outside the table
+(`sx`, `u3`, controlled rotations, `rxx`, …) are rejected with no circuit. A
+program that lowers to an empty list is rejected.
 Escrow uses the lowered gate count, not the source statement count.
 
 Examples: [`examples/circuits/qasm/`](../examples/circuits/qasm/).
