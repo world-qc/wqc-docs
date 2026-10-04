@@ -158,7 +158,7 @@ Content-Type: application/json
 | --- | --- |
 | `client_id` | Required when billing is on |
 | `qubit_count` | Global register width |
-| `security_level` | `"low"` \| `"normal"` \| `"high"` \| `"ultra"` → `required_votes` **and** FRI `num_queries` (8/16/32/40) for unitary / Born / trajectory / compose outer STARKs and PCS cert slots (see [zk-STARK.md §5.1](../spec/zk-STARK.md#51-securitylevel--fri-query-ladder)). Nested FriFold/DeepRo/Mmcs internals stay at 40. |
+| `security_level` | `"low"` \| `"normal"` \| `"high"` \| `"ultra"` → `required_votes` **and** FRI `num_queries` (8/16/32/40) for unitary / Born / trajectory / compose outer STARKs and PCS cert slots (see [zk-STARK.md §5.1](../spec/zk-STARK.md#51-securitylevel--fri-query-ladder)). Escrow `TotalFee` scales by `num_queries / 16` (`normal` 1×, `high` 2×; [economics.md](../spec/economics.md) §2). Nested FriFold/DeepRo/Mmcs internals stay at 40. |
 | `circuit` | Gate list (`type` + `params`) |
 | `output_mode` | Omit → `statevector_scalar`. Also `sample_counts`, `expectation` |
 | `shots` | Required for `sample_counts` |
