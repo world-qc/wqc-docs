@@ -10,6 +10,7 @@ All curated submit payloads live here. The E2E registry (`../e2e/manifest.tsv`) 
 | [`multislice/`](multislice/) | MP1 idle-wire sample | `multislice_4q_counts` |
 | [`mid_circuit/`](mid_circuit/) | Phase C1 / C2c IF + MEASURE | mid-circuit IF (± multislice) |
 | [`noise/`](noise/) | Phase C3 noise_model | `noise_depolarizing_counts` |
+| [`qasm/`](qasm/) | OpenQASM linear subset (not an E2E payload) | `bell.qasm`, `bell.qasm3` |
 
 ## Convention
 

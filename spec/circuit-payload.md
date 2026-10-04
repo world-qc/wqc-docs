@@ -20,6 +20,7 @@ document rather than restating it:
 | Surface | Structural spec |
 |---------|-----------------|
 | Client → orchestrator (`POST /api/v1/submit`) | `wqc-orchestrator/openapi/openapi.yaml` |
+| Client → orchestrator (`POST /api/v1/qasm/translate`) | `wqc-orchestrator/openapi/openapi.yaml` |
 | Node → core (`POST /compute`) | `wqc-core/openapi/openapi.yaml` |
 
 Orchestrator → node dispatch is not HTTP; it is a signed binary `SubTask` frame over
@@ -179,3 +180,33 @@ identity on qubit 1.
 Observable `id` must be unique within a request, and results are keyed by it. An
 observable with no terms, an unknown Pauli character, or a length mismatch is rejected.
 `expectation` also forbids `MEASURE` gates entirely.
+
+## 8. OpenQASM linear subset
+
+`POST /api/v1/qasm/translate` and the `openqasm` field on `POST /api/v1/submit`
+lower OpenQASM 2.0 / 3.0 **straight-line** programs into the gate list in §1.
+The orchestrator does this before `ValidateSubmitRequest`. `wqc-core` still
+receives the lowered JSON only.
+
+Registers flatten in declaration order. `q[0]` is qubit 0 and `c[0]` is cbit 0,
+which matches the Qiskit bit order in §3.1. `include` is accepted only as the
+markers `stdgates.inc` and `qelib1.inc`; the file is not opened.
+
+| Source | Emitted JSON |
+|--------|----------------|
+| `h` `x` `y` `z` `s` `t` `rx` `ry` `rz` `cx` `cz` `ccx` `measure` `reset` | The native gate. `cx` / `ccx` become `CNOT` / `CCNOT`. |
+| `sdg` | `Z`, then `S` (phase-exact for `statevector_scalar`) |
+| `tdg` | `Z`, then `S`, then `T` |
+| `swap` | three `CNOT`s |
+| `id` / `i` | dropped |
+| `barrier` | dropped, with a warning |
+
+Angles are radians. `pi` and `+ - * /` fold at translate time. `S` is not rewritten
+as `RZ(π/2)`: core `RZ` carries a global phase that `statevector_scalar` returns.
+
+`while`, `for`, `if`, `extern`, `defcal`, pulse, custom `gate` definitions, and
+gates outside the table (`sx`, `u3`, controlled rotations, `rxx`, …) are
+rejected with no circuit. A program that lowers to an empty list is rejected.
+Escrow uses the lowered gate count, not the source statement count.
+
+Examples: [`examples/circuits/qasm/`](../examples/circuits/qasm/).
