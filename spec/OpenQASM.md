@@ -44,8 +44,11 @@ the declared width, not the number of measurements.
 | `sdg` | `Z`, then `S` |
 | `tdg` | `Z`, then `S`, then `T` |
 | `swap` | three `CNOT`s |
-| `id` / `i` | dropped |
+| `id` / `i` | dropped, with a warning |
 | `barrier` | dropped, with a warning |
+
+`id`, `i`, and `barrier` warnings use `QASM_IGNORED`. The circuit is still
+returned.
 
 `sdg` and `tdg` stay phase-exact. `S` is `diag(1, i)` in the core and is not
 rewritten as `RZ(π/2)`, because that global phase shows up in
@@ -53,7 +56,8 @@ rewritten as `RZ(π/2)`, because that global phase shows up in
 
 Angles are radians. `pi`, `+ - * /`, parentheses, and OpenQASM 3 `const` names
 fold at translate time. A `const` may be used as a rotation angle or as a
-register width.
+register width. Inside a `gate` or `def`, an angle parameter hides a `const`
+of the same name, and a parameter named `pi` is that parameter.
 
 A `gate` or `def` whose body is itself straight-line is inlined, including a
 call to another inlineable definition. Angle parameters and qubit or bit
@@ -66,7 +70,7 @@ Both measure forms are accepted: `measure q -> c` and `c = measure q`.
 
 ## What is rejected
 
-Any diagnostic rejects the whole program. There is no partial circuit.
+An error diagnostic rejects the whole program. There is no partial circuit.
 
 | Condition | Code |
 |-----------|------|
@@ -75,6 +79,10 @@ Any diagnostic rejects the whole program. There is no partial circuit.
 | `include` other than the two markers above | `QASM_UNSUPPORTED_INCLUDE` |
 | `opaque`, a `gate` / `def` body that is not straight-line, a recursive definition, or a definition that shadows a built-in gate | `QASM_CUSTOM_GATE` |
 | Angle that is not a compile-time constant, including function calls | `QASM_NONCONST_PARAM` |
+| Undeclared register | `QASM_UNDECLARED` |
+| Index out of range, or an index on a gate parameter | `QASM_INDEX` |
+| Source, statement, expression, register, or lowered-gate limit | `QASM_LIMIT` |
+| Syntax the parser cannot read, including a `gate` or `def` whose name is a statement keyword | `QASM_PARSE` |
 | Version missing, or not 2.0 / 3.0 | `QASM_VERSION` |
 | Program that lowers to no gates | `QASM_EMPTY` |
 | `circuit` and `openqasm` together, or an explicit width that disagrees with the declarations | `QASM_CONFLICT` |
