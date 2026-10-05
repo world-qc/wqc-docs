@@ -5,7 +5,7 @@
 - **Verified:** 2026-08-19
 - **Verified against:** `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
-- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md)
+- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
 > This document describes the **current** WQC stack as implemented: a single orchestrator,
 > a permissionless worker swarm, a remote composer that seals a root STARK, and optional
@@ -156,15 +156,17 @@ economics receipt is published.
 
 ### 4.1 Flow
 
-1. **Quote** — `POST /api/v1/economy/quote` estimates escrow from qubit/gate count and current BaseFee:
+1. **Quote** — `POST /api/v1/economy/quote` estimates escrow from qubit/gate count, `security_level`, and current BaseFee:
    ```
    estimated_slices = max(1, 2^(qubits - 26))   // compact-register BFS upper bound
+   fri_bps          = fri_queries × 10000 / 16  // low 8, normal 16, high 32, ultra 40
+   TotalFee         = Gas × BaseFee × 10^9 × fri_bps / 10000
    per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)
                       //          compute per node    R_pcs  burn
                       // stragglers draw from deferred burn, not extra escrow
    escrow           = estimated_slices × per_slice × safety_bps/10000
    ```
-   At `required_votes = 2` the per-slice coefficient is `1.4 × TotalFee`. Default `WQC_ESCROW_SAFETY_BPS=10000` (no margin).
+   At `required_votes = 2` the per-slice coefficient is `1.4 × TotalFee`. `normal` and `high` share that vote count; `high` TotalFee is 2× `normal`, so escrow is 2×. Settlement debits use the same `fri_bps`. Default `WQC_ESCROW_SAFETY_BPS=10000` (no margin).
 2. **Submit** — client sends `client_id` (required when `WQC_CLIENT_BILLING=1`); orchestrator locks escrow from `economy:client:{id}:balance`. BaseFee is **locked per task**.
 3. **Accrue** — quorum / PCS / straggler debit client escrow and credit operator balances.
 4. **Finalize** — after `WQC_STRAGGLER_GRACE_SECS`, settle pending burns, refund unused escrow, upload economics receipt.
@@ -298,4 +300,4 @@ Dev and reference compose files may co-locate more of this on one machine. A sta
 - [`zk-STARK.md`](zk-STARK.md) — proof transcripts, AIR, leaf PCS, recursive aggregation
 - [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap of $\pi_{\text{Root}}$ for L2 settle
 - [`../examples/E2E.md`](../examples/E2E.md) — submit/poll, status machine, manifest shape for a reference stack
-- [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md) — product and economics narrative. The live phase is the centralized orchestrator + libp2p swarm; later DHT / on-chain sections are roadmap, not this diagram
+- [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md) — product and economics narrative. The live phase is the centralized orchestrator + libp2p swarm; later DHT / on-chain sections are roadmap, not this diagram

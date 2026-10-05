@@ -3,7 +3,7 @@
 - **Status:** Draft
 - **Tier:** A (canonical protocol spec)
 - **Audience:** Protocol designers, contract authors, and implementers who need the normative fee and settlement rules
-- **Related:** [`architecture.md`](architecture.md), [`architecture-current.md`](architecture-current.md), [`zk-SNARK.md`](zk-SNARK.md), [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md)
+- **Related:** [`architecture.md`](architecture.md), [`architecture-current.md`](architecture-current.md), [`zk-SNARK.md`](zk-SNARK.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
 This document is the **normative** economics specification: units, gas, reward splits, escrow, economics receipts, and on-chain settlement. It does not define Redis keys, environment variables, or HTTP paths — those live in [`architecture-current.md`](architecture-current.md) §4.
 
@@ -29,7 +29,9 @@ The atomic billing unit is one **sub-task** (one compact-register slice executio
 
 ```
 Gas_quantum = α·VRAM_MiB + β·GateCount + γ·TraceRows
-TotalFee    = Gas_quantum × BaseFee × 10^9     (pWQC; BaseFee in sWQC / gas)
+fri_bps     = fri_queries(security_level) × 10000 / 16
+TotalFee    = Gas_quantum × BaseFee × 10^9 × fri_bps / 10000
+              (pWQC; BaseFee in sWQC / gas; normal tier is fri_bps = 10000)
 R_compute   = TotalFee × 40 / 100             (pWQC, per quorum majority node)
 R_pcs       = TotalFee × 40 / 100             (pWQC, once per slice PCS delivery)
 Burn        = TotalFee × 20 / 100             (pWQC)
@@ -42,6 +44,10 @@ R_net       = R_compute + R_pcs               (80%, worker budget)
 | `GateCount` | Pruned gate list length | Length of the dispatched circuit |
 | `TraceRows` | STARK execution trace rows | Attested in the work report (fallback: $\max(4, \mathrm{GateCount}+1)$) |
 | `BaseFee` | WQC per gas, stored as sWQC | Locked per parent task at submit; may adjust globally between tasks |
+| `fri_queries` | Outer FRI `num_queries` for the task tier | `low` 8, `normal` 16, `high` 32, `ultra` / empty / unknown 40 ([`zk-STARK.md`](zk-STARK.md) §5.1) |
+| `fri_bps` | TotalFee scale vs `normal` | `queries × 10000 / 16` → 5000 / 10000 / 20000 / 25000 |
+
+`fri_bps` prices prove and verify work. Quorum size is a separate multiplier in the escrow bound (§3.1): `normal` and `high` both use `required_votes = 2`, so their price gap is the FRI factor alone (`high` = 2× `normal`). Quote and settlement apply the same `fri_bps` to `TotalFee` before the 40/40/20 split. Integer division is in Planck.
 
 VRAM is measured in **MiB**, not KiB, so default coefficients keep per-slice rewards compatible with the 210M supply.
 
@@ -86,6 +92,7 @@ Off-chain ledgers (testnet Redis) may **accrue** rewards at quorum / PCS / strag
 
 ```
 estimated_slices = max(1, 2^(qubits - target_width))
+TotalFee         = Gas_quantum × BaseFee × 10^9 × fri_bps / 10000
 per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)
 escrow           = estimated_slices × per_slice × safety_factor
 ```
@@ -137,7 +144,7 @@ Out of scope for on-chain settlement: DHT multi-orchestrator, replacing libp2p P
 
 ### Small circuit
 
-2 qubits, 1 gate, 4 trace rows, BaseFee $= 0.001$ WQC/gas:
+2 qubits, 1 gate, 4 trace rows, BaseFee $= 0.001$ WQC/gas, `security_level = normal` (`fri_bps = 10000`):
 
 ```
 Gas        = 6
@@ -147,13 +154,19 @@ R_pcs      = 0.0024 WQC
 Burn       = 0.0012 WQC
 ```
 
+The same circuit at `high` (`fri_bps = 20000`) has TotalFee $= 0.012$ WQC. At `low` it is $0.003$ WQC. At `ultra` it is $0.015$ WQC.
+
 ### ~26-qubit slice
+
+`security_level = normal`:
 
 ```
 VRAM_MiB ≈ 1024, GateCount ≈ 50, TraceRows ≈ 100
 Gas      ≈ 1174
 TotalFee ≈ 1.174 WQC
 ```
+
+`high` on the same slice is $\approx 2.348$ WQC before the quorum coefficient. With `required_votes = 2` the client per-slice bound is $1.4\times$ that TotalFee for both tiers, so `high` escrow is twice `normal`.
 
 ---
 
@@ -162,4 +175,4 @@ TotalFee ≈ 1.174 WQC
 - [`architecture.md`](architecture.md) §6–8 — trust, settlement contract, migration
 - [`architecture-current.md`](architecture-current.md) §4 — live Redis / env / HTTP / receipt wiring
 - [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap for on-chain validity finalize
-- [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md) §4 — supply, burn narrative, vesting
+- [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md) §4 — supply, burn narrative, vesting

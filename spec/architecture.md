@@ -3,7 +3,7 @@
 - **Status:** Draft
 - **Tier:** A (canonical protocol spec)
 - **Audience:** Protocol designers, researchers, and readers who need a specification of the finished system before it is fully built
-- **Related:** [`architecture-current.md`](architecture-current.md) (current implementation), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.4_en.md`](../whitepaper/WHITEPAPER_0.4_en.md)
+- **Related:** [`architecture-current.md`](architecture-current.md) (current implementation), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
 ## Abstract
 
@@ -43,7 +43,7 @@ The target architecture defines:
 - The zk-STARK transcript, AIR constraints, and recursion internals — specified in [`zk-STARK.md`](zk-STARK.md).
 - The SNARK wrap of $\pi_{\text{Root}}$ for on-chain validity — specified in [`zk-SNARK.md`](zk-SNARK.md).
 - The current implementation layout — specified in [`architecture-current.md`](architecture-current.md).
-- The narrative vision, tokenomics math, and marketing framing — the [`whitepaper`](../whitepaper/WHITEPAPER_0.4_en.md). Fee/settlement norms — [`economics.md`](economics.md).
+- The narrative vision, tokenomics math, and marketing framing — the [`whitepaper`](../whitepaper/WHITEPAPER_0.5_en.md). Fee/settlement norms — [`economics.md`](economics.md).
 
 ### 1.3 Relationship to the roadmap
 
@@ -304,13 +304,13 @@ that will be produced before mainnet.
 
 Normative fees, escrow, identities, and on-chain settlement rules:
 [`economics.md`](economics.md). Product narrative (supply, vesting story):
-[whitepaper](../whitepaper/WHITEPAPER_0.4_en.md) §4.
+[whitepaper](../whitepaper/WHITEPAPER_0.5_en.md) §4.
 
 Architecture constraints that economics must satisfy:
 
 - **Escrow as the unit of commitment.** Every task carries an upfront escrow computed from
-  the compact-register slice bound. The escrow is the maximum the client can lose and the
-  miners' guarantee of payment.
+  the compact-register slice bound, quorum size, and FRI tier. The escrow is the maximum
+  the client can lose and the miners' guarantee of payment.
 - **Gas market.** The price of work reflects supply (miner capacity) and demand (queued
   tasks); the mechanism must be transparent and not manipulable by the coordinator.
 - **Burn.** The automatic burn rate is a fixed protocol constant applied at settlement
