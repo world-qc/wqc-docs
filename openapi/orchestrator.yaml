@@ -158,12 +158,14 @@ paths:
         `lowered_gate_count` is the length after alias expansion (`swap` is
         three `CNOT`s, `tdg` is `Z`,`S`,`T`). Quote escrow from that count.
 
-        Fail-closed: any diagnostic returns `400` and no `circuit`. `while`,
+        Fail-closed: any error diagnostic returns `400` and no `circuit`. `while`,
         `for`, `if`, `extern`, `defcal`, pulse, and gates outside the Tier A
         set (`h` `x` `y` `z` `s` `t` `sdg` `tdg` `rx` `ry` `rz` `cx` `cz`
         `ccx` `swap` `id` `measure` `reset`) are rejected. `include` is
         accepted only for `stdgates.inc` and `qelib1.inc` and is never read
-        from disk. Source is capped at 256 KiB.
+        from disk. The HTTP body is capped at 1 MiB before JSON decode.
+        Source is capped at 256 KiB. A second JSON value after the object
+        is rejected.
       operationId: translateOpenQASM
       requestBody:
         required: true
@@ -186,13 +188,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/TranslateResponse"
         "400":
-          description: OpenQASM was rejected. No partial circuit is returned.
+          description: OpenQASM was rejected, or the JSON body is invalid. No partial circuit is returned.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/QasmErrorBody"
         "405":
-          $ref: "#/components/responses/MethodNotAllowed"
+          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QasmErrorBody"
+        "413":
+          description: Request body exceeds 1 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QasmErrorBody"
 
   /api/v1/task/{task_id}:
     get:
@@ -880,7 +892,8 @@ components:
             `QASM_UNSUPPORTED_INCLUDE`, `QASM_CUSTOM_GATE`,
             `QASM_NONCONST_PARAM`, `QASM_UNDECLARED`, `QASM_INDEX`,
             `QASM_VERSION`, `QASM_EMPTY`, `QASM_LIMIT`, `QASM_PARSE`,
-            `QASM_CONFLICT`.
+            `QASM_CONFLICT`, `QASM_IGNORED`. `QASM_IGNORED` is a warning
+            on a successful translate (`barrier`, dropped `id`).
         message:
           type: string
 
