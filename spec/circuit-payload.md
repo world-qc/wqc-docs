@@ -5,7 +5,7 @@
 - **Verified:** 2026-08-29
 - **Verified against:** `wqc-orchestrator@9f539f6` `wqc-core@f162911` `wqc-node@2718da4`
 - **Audience:** Client developers, and implementers of the submit / dispatch / compute path
-- **Related:** `wqc-orchestrator/openapi/openapi.yaml`, `wqc-core/openapi/openapi.yaml`, `wqc-core/doc/trace-spec.md`, [`spec/zk-STARK.md`](zk-STARK.md)
+- **Related:** `wqc-orchestrator/openapi/openapi.yaml`, `wqc-core/openapi/openapi.yaml`, `wqc-core/doc/trace-spec.md`, [`spec/zk-STARK.md`](zk-STARK.md), [`spec/OpenQASM.md`](OpenQASM.md)
 
 ## Scope
 
@@ -186,7 +186,8 @@ observable with no terms, an unknown Pauli character, or a length mismatch is re
 `POST /api/v1/qasm/translate` and the `openqasm` field on `POST /api/v1/submit`
 lower OpenQASM 2.0 / 3.0 **straight-line** programs into the gate list in §1.
 The orchestrator does this before `ValidateSubmitRequest`. `wqc-core` still
-receives the lowered JSON only.
+receives the lowered JSON only. Which programs are accepted, and which are
+refused with no circuit, is [`OpenQASM.md`](OpenQASM.md).
 
 Registers flatten in declaration order. `q[0]` is qubit 0 and `c[0]` is cbit 0,
 which matches the Qiskit bit order in §3.1. `include` is accepted only as the
