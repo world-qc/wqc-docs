@@ -3,6 +3,7 @@
 Linear OpenQASM 2.0 / 3.0 programs for `POST /api/v1/qasm/translate` and the
 `openqasm` field on `POST /api/v1/submit`. These are not E2E manifest rows.
 The lowered JSON is the circuit payload in [`circuit-payload.md`](../../../spec/circuit-payload.md) §8.
+What the translator accepts and refuses is [`OpenQASM.md`](../../../spec/OpenQASM.md).
 
 | File | What it lowers to |
 |------|-------------------|
