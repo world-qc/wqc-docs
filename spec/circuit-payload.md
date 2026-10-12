@@ -133,9 +133,9 @@ This is what makes shot-based results consensus-checkable:
 
 | Mode | Quorum comparison |
 |------|-------------------|
-| `statevector_scalar` | Epsilon match on the amplitude |
-| `expectation` | Epsilon match on each value |
-| `sample_counts` | **Exact** match under the shared seed |
+| `statevector_scalar` | Real and imag snapped to a 1e-6 grid, then exact match |
+| `expectation` | Each value snapped to that same grid, then exact match |
+| `sample_counts` | **Exact** histogram match. Terminal shots are drawn from Born probabilities of the statevector after the same 1e-6 snap, under the shared seed |
 
 A worker returning a differently-seeded or noisy histogram fails quorum. This is also
 why `noise_model` weakens the proof — see §6.
