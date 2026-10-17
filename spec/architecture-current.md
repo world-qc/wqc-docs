@@ -191,7 +191,10 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 
 | Key | Value |
 | --- | --- |
-| `economy:operator:{operator_id}:balance` | Operator pWQC balance (decimal string) |
+| `economy:operator:{operator_id}:balance` | Wallet pWQC (faucet and rewards; not job collateral) |
+| `economy:operator:{operator_id}:staked` | Operator-chosen stake pWQC |
+| `economy:operator:{operator_id}:stake_locked` | In-flight reservation total, a subset of `staked` |
+| `economy:stake_lock:{sub_task_id}:{node_id}` | One assignment reservation. Repeat lock / release / forfeit is a no-op |
 | `economy:operator:{operator_id}:pubkey` | Operator Ed25519 public key (base64) |
 | `economy:peer_operator:{peer_id}` | Maps libp2p peer → operator_id |
 | `economy:client:{client_id}:balance` | Client pWQC balance |
@@ -208,7 +211,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:settlement:log` | RPUSH JSON audit entries |
 
 Logs use `[LEDGER REWARD]`, `[LEDGER BURN]`, etc. Balances survive orchestrator restarts.
-Settlement log types include `escrow_lock`, `escrow_debit`, `escrow_refund`, `client_credit`.
+Settlement log types include `escrow_lock`, `escrow_debit`, `escrow_refund`, `client_credit`, `stake`, and `unstake`.
 
 ### 4.3 Environment
 
@@ -225,8 +228,9 @@ Settlement log types include `escrow_lock`, `escrow_debit`, `escrow_refund`, `cl
 | `WQC_BASE_FEE_TARGET_QUEUE` | `10` | Target active sub-task queue depth |
 | `WQC_BASE_FEE_ADJUST_BPS` | `500` | ±5% step per adjustment |
 | `WQC_ESCROW_SAFETY_BPS` | `10000` | Escrow headroom (10000 = 100%) |
-| `WQC_MAX_DEV_STAKE_WQC` | `100` | Max auto-registered bid stake |
-| `WQC_NODE_STAKE_WQC` | `0.05` | Node bid `stake_amount` (→ pWQC on wire) |
+| `WQC_MAX_DEV_STAKE_WQC` | `100` | Cap for one-shot dev auto-stake when `WQC_DEV_STAKE_AUTO=1` |
+| `WQC_DEV_STAKE_AUTO` | `0` | When `1` and both `staked` and `stake_locked` are 0, write the bid claim into `staked` once if it is within the cap. Does not fund the wallet. Devnet compose sets `1`; public testnet sets `0` |
+| `WQC_NODE_STAKE_WQC` | `0.05` | Node bid `stake_amount` (→ pWQC on wire). Compared with `staked - stake_locked` |
 
 ### 4.4 HTTP API
 
