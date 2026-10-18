@@ -199,8 +199,9 @@ sequenceDiagram
    circuit, slice assignments, bond-dimension hints, and the shared result seed.
 4. **Compute and prove.** Miners contract their slice and emit a leaf STARK proof bound to
    the task, slice, node identity, and result hash.
-5. **Quorum and PCS.** Leaf results are checked against the quorum policy (epsilon match for
-   scalars/expectations, exact match for `sample_counts` under the issued seed). Leaf
+5. **Quorum and PCS.** Leaf results are checked against the quorum policy (1e-6 grid match for
+   scalars/expectations, exact match for `sample_counts` under the issued seed). Trapdoor
+   audits use that same grid against the golden simulation. Leaf
    proof-commitment (leaf PCS) bundles are produced by a designated miner, or by open call,
    or by the aggregator as a fallback.
 6. **Aggregation.** An aggregator builds the recursive composition tree (a single leaf is
