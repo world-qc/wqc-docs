@@ -364,7 +364,7 @@ Building the skeleton of a planetary Swarm on **libp2p**, connecting bidding, sl
 The following core modules have passed end-to-end (e2e) verification in the current development environment (devnet):
 
 * **libp2p Swarm Communication**: P2P implementation of task announcement via Gossip protocol, bid stream, dispatch, and result return.
-* **Permissionless Bidding and Quorum**: Signed bidding, weighted lottery selection, node capability matching, slice-level majority vote (floating-point epsilon agreement and counts exact match).
+* **Permissionless Bidding and Quorum**: Signed bidding, weighted lottery selection, node capability matching, slice-level majority vote (1e-6 amplitude grid agreement and counts exact match).
 * **Compact-register slicing**: BFS slice tree from bid-pool max-qubit capability. Each leaf is a compact-register circuit (width $N-C$ after fixing $C$ tensor legs) executed asynchronously.
 * **Leaf-to-root proof aggregation**: From leaf STARK verification to a single root-verification STARK via Aggregation STARK constructing a binary tree.
 * **Polymorphic output modes and Born rule proof**: Sampling (`sample_counts`) and expectation (`expectation`) modes, dynamic circuits (mid-circuit measurement), deterministic resampling via seed binding, and `DistributionAir` implementation for probability distribution validity.
