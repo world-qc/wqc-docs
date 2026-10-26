@@ -40,7 +40,7 @@ R_net       = R_compute + R_pcs               (80%, worker budget)
 
 | Symbol | Meaning | Normative source |
 | --- | --- | --- |
-| `VRAM_MiB` | Peak workspace size | $\lceil 2^{q} \times 16 / 2^{20} \rceil$ for compact width $q$ |
+| `VRAM_MiB` | Peak workspace size | Scalar (`statevector_scalar`, or empty): $\lceil N \chi^{2} \times 32 / 2^{20} \rceil$ with $\chi = \min(\mathrm{task}, 128)$ (task χ 0 means 128). `sample_counts` and `expectation`: $\lceil 2^{q} \times 16 / 2^{20} \rceil$ for compact width $q$ |
 | `GateCount` | Pruned gate list length | Length of the dispatched circuit |
 | `TraceRows` | STARK execution trace rows | Attested in the work report (fallback: $\max(4, \mathrm{GateCount}+1)$) |
 | `BaseFee` | WQC per gas, stored as sWQC | Locked per parent task at submit; may adjust globally between tasks |
@@ -156,9 +156,9 @@ Burn       = 0.0012 WQC
 
 The same circuit at `high` (`fri_bps = 20000`) has TotalFee $= 0.012$ WQC. At `low` it is $0.003$ WQC. At `ultra` it is $0.015$ WQC.
 
-### ~26-qubit slice
+### ~26-qubit slice (`sample_counts` / `expectation`)
 
-`security_level = normal`:
+Dense workspace. `security_level = normal`:
 
 ```
 VRAM_MiB ≈ 1024, GateCount ≈ 50, TraceRows ≈ 100
@@ -167,6 +167,8 @@ TotalFee ≈ 1.174 WQC
 ```
 
 `high` on the same slice is $\approx 2.348$ WQC before the quorum coefficient. With `required_votes = 2` the client per-slice bound is $1.4\times$ that TotalFee for both tiers, so `high` escrow is twice `normal`.
+
+A 50-qubit scalar slice at χ = 128 has workspace $\lceil 50 \times 128^{2} \times 32 / 2^{20} \rceil = 25$ MiB. Quote-time escrow for a scalar parent that fits in 2048 qubits (χ=128 workspace of 1 GiB) is one slice. Dispatch uses each bid's `max_mps_qubits` instead of that stand-in.
 
 ---
 
