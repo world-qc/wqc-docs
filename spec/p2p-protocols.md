@@ -181,11 +181,14 @@ mps_site_order_len   uint32 BE
 mps_site_order       count x uint32 BE
 security_level_len   uint32 BE
 security_level       []byte
+mps_time_split       uint32 BE   (omitted when 0)
 ```
 
 Scalar-only tasks send zero or empty for `output_mode`, `shots`, `classical_bit_count`,
 and `sample_seed`. An empty `mps_site_order` means identity. An empty `security_level`
-means the FRI default.
+means the FRI default. `mps_time_split` is the gate index that splits a scalar into two
+MPS sweeps. It is omitted when zero so an older node still verifies ordinary dispatches;
+a node that does not know the field rejects only time-split tasks.
 
 **`PcsRequest`** — signed by the orchestrator:
 
@@ -317,6 +320,7 @@ compute but has no payout binding.
     "required_votes": 2,
     "mps_max_bond_dim": 128,
     "mps_site_order": [],
+    "mps_time_split": 0,
     "output_mode": "sample_counts",
     "classical_bit_count": 2,
     "shots": 1024,
