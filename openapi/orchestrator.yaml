@@ -304,7 +304,10 @@ paths:
       summary: Estimate client escrow without locking funds
       description: |
         `gate_count` of `0` is treated as `1`. Unknown `security_level`
-        is coerced to `normal`.
+        is coerced to `normal`. Empty `output_mode` is `statevector_scalar`
+        (MPS quote width stand-in 2048). When `circuit` is present, scalar
+        slice estimates follow the MPS cutwidth / time-split walk; a walk
+        that hits the work ceiling returns 400.
       operationId: postEconomyQuote
       requestBody:
         required: true
@@ -1252,6 +1255,21 @@ components:
         security_level:
           type: string
           description: Invalid values are coerced to `normal`
+        output_mode:
+          type: string
+          description: |
+            Empty or `statevector_scalar` uses the MPS scalar estimate
+            (stand-in width 2048). `sample_counts` and `expectation` keep
+            the dense compact-register envelope (target 26).
+        circuit:
+          type: array
+          description: |
+            Optional gate list (same shape as submit). Used for scalar MPS
+            cutwidth / time-split slice estimates when `output_mode` is
+            scalar. Omitted → `2^(qubits - 2048)` stand-in for scalars.
+          items:
+            type: object
+            additionalProperties: true
 
     EconomyQuoteResponse:
       type: object

@@ -156,9 +156,12 @@ economics receipt is published.
 
 ### 4.1 Flow
 
-1. **Quote** — `POST /api/v1/economy/quote` estimates escrow from qubit/gate count, `security_level`, and current BaseFee:
+1. **Quote** — `POST /api/v1/economy/quote` estimates escrow from qubit/gate count, optional `circuit` / `output_mode`, `security_level`, and current BaseFee:
    ```
-   estimated_slices = max(1, 2^(qubits - 26))   // compact-register BFS upper bound
+   // sample_counts / expectation: compact-register BFS upper bound (target 26)
+   // statevector_scalar (empty mode): MPS stand-in width 2048; with circuit,
+   //   estimated_slices follows the cutwidth / time-split walk (see economics.md §3.1)
+   estimated_slices = max(1, 2^(qubits - target_width))   // no-circuit stand-in
    fri_bps          = fri_queries × 10000 / 16  // low 8, normal 16, high 32, ultra 40
    TotalFee         = Gas × BaseFee × 10^9 × fri_bps / 10000
    per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)

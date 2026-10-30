@@ -137,6 +137,12 @@ lottery_proof        []byte (opaque)
 supported_features   uint32 BE
 ```
 
+`max_mps_qubits` is **not** in this layout. The concatenation has no length prefix, so
+appending a field would make older bids fail verification. It travels as an unsigned
+JSON field (omitted when 0), the same way `metrics_summary` does. The orchestrator
+uses it only to decide whether a scalar slice fits the node's χ=128 MPS workspace.
+A missing field falls back to `max_qubit_capability`.
+
 **Operator signature on a bid** — a second, independent signature by the operator key,
 binding the economic identity that will be paid:
 
@@ -175,11 +181,14 @@ mps_site_order_len   uint32 BE
 mps_site_order       count x uint32 BE
 security_level_len   uint32 BE
 security_level       []byte
+mps_time_split       uint32 BE   (omitted when 0)
 ```
 
 Scalar-only tasks send zero or empty for `output_mode`, `shots`, `classical_bit_count`,
 and `sample_seed`. An empty `mps_site_order` means identity. An empty `security_level`
-means the FRI default.
+means the FRI default. `mps_time_split` is the gate index that splits a scalar into two
+MPS sweeps. It is omitted when zero so an older node still verifies ordinary dispatches;
+a node that does not know the field rejects only time-split tasks.
 
 **`PcsRequest`** — signed by the orchestrator:
 
@@ -258,6 +267,7 @@ over `/wqc/task-announce/1.0.0`.
   "task_id": "uuid-v7-task-identifier",
   "node_id": "12D3KooW...",
   "max_qubit_capability": 34,
+  "max_mps_qubits": 2048,
   "current_load_factors": 0,
   "timestamp": 1717776000,
   "lottery_attempt": 0,
@@ -284,8 +294,11 @@ big integer.
 
 `location` is egress GeoIP telemetry, not device GPS. `metrics_summary` is an unsigned
 health snapshot that the orchestrator re-exports as Prometheus gauges labeled by
-`node_id`. Neither is covered by the bid signature, so neither may be trusted for
-consensus or payment.
+`node_id`. `max_mps_qubits` is the χ=128 MPS compact width for scalar slices (1 GiB
+holds 2048 sites). None of the three is covered by the bid signature.
+`metrics_summary` must not be trusted for consensus or payment. `max_mps_qubits`
+only chooses the scalar slice width; a node that overstates it is still bounded by
+the core memory check on `N · χ² · 32` bytes.
 
 `operator_id` and `operator_sig` carry the economic identity separately from the node
 identity, so one operator can run many nodes. Without them a bid is still valid for
@@ -307,6 +320,7 @@ compute but has no payout binding.
     "required_votes": 2,
     "mps_max_bond_dim": 128,
     "mps_site_order": [],
+    "mps_time_split": 0,
     "output_mode": "sample_counts",
     "classical_bit_count": 2,
     "shots": 1024,
