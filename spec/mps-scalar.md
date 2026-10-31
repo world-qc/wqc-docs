@@ -2,10 +2,10 @@
 
 - **Status:** Working spec — scalar slice contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-10-28
-- **Verified against:** `wqc-orchestrator@220d17f` `wqc-core@7c721e2` `wqc-node@096dcf4` `wqc-stark-engine@12bfb3c`
+- **Verified:** 2026-11-01
+- **Verified against:** uncommitted `feature/contraction-tree` in `wqc-orchestrator`, `wqc-node`, and `wqc-core` (tree handoff). MPS path prior snapshot: `wqc-orchestrator@220d17f` `wqc-core@7c721e2` `wqc-node@096dcf4` `wqc-stark-engine@12bfb3c`
 - **Audience:** Implementers of the scheduler, node and core; reviewers of quorum and proof claims
-- **Related:** [`circuit-payload.md`](circuit-payload.md) (output modes, determinism), [`p2p-protocols.md`](p2p-protocols.md) (wire layouts), [`economics.md`](economics.md) (fees and escrow), [`zk-STARK.md`](zk-STARK.md) (proof format), `wqc-core/doc/tn-engine.md` (module layout, WebGPU, env vars)
+- **Related:** [`circuit-payload.md`](circuit-payload.md) (output modes, determinism), [`contraction-tree.md`](contraction-tree.md) (scalar with an exact tree), [`p2p-protocols.md`](p2p-protocols.md) (wire layouts), [`economics.md`](economics.md) (fees and escrow), [`zk-STARK.md`](zk-STARK.md) (proof format), `wqc-core/doc/tn-engine.md` (module layout, WebGPU, env vars)
 
 ## Scope
 
@@ -26,12 +26,17 @@ live in [`economics.md`](economics.md); the signed dispatch bytes live in
 
 | Output mode | Path | Width limit |
 |-------------|------|-------------|
-| `statevector_scalar` (or empty) | MPS contraction, `⟨0…0\|ψ⟩` | memory budget `N · χ² · 32` bytes (§2) |
+| `statevector_scalar` whose exact tree fits (empty `output_mode` is normalized to this mode) | Exact contraction, `⟨0…0\|ψ⟩` ([`contraction-tree.md`](contraction-tree.md)) | Core: 26 open legs and a live peak of at most 1 GiB. Node acceptance stays `max_mps_qubits`. One full-register slice |
+| `statevector_scalar` with no tree | MPS contraction, `⟨0…0\|ψ⟩` | memory budget `N · χ² · 32` bytes (§2) |
 | `expectation`, `sample_counts` | MPS sweep, then projection to a dense statevector | host `contract_to_statevector` requires `N ≤ 20`; the Born STARK path stops at 16 qubits |
 
-Only the scalar path scales past the dense envelope. Expectation and sample slicing keep the
-dense compact width, and keep branching down to the 20-qubit limit. The scalar rules below
-do not apply to them.
+Submit normalizes an empty `output_mode` to `statevector_scalar` before the task
+is stored. Quote already treats that empty mode as `statevector_scalar`, so a
+circuit there can carry a tree. No dispatch carries an empty mode: a trap
+sub-task copies the parent's mode. A trap is still built from a different
+circuit, so it does not carry the parent's tree. The sections below are the
+no-tree scalar. Expectation and sample slicing keep the dense compact width, and
+keep branching down to the 20-qubit limit.
 
 ## 2. Memory and bond dimension
 
@@ -72,6 +77,11 @@ dimensions.
 
 ## 4. Scheduling a scalar parent
 
+A non-empty scalar whose greedy exact tree fits is one slice and is not branched,
+including when the walk below would hit a ceiling
+([`contraction-tree.md`](contraction-tree.md)). This section is the schedule when
+that plan returns no tree, and when the circuit is empty.
+
 A scalar slice is dispatched as one slice when both hold:
 
 1. its compact width does not exceed the pool's allowed MPS width (derived from the bids'
@@ -103,13 +113,15 @@ The estimate is **rejected** (quote and submit) when any of these ceilings is re
 |---------|-------|
 | Estimated slices | `2^30` |
 | Branch-walk nodes | 4096 |
-| Gates | 100 000 |
+| Gates | 100000 |
 | Qubits | 4096 |
 
 **Quote.** `POST /api/v1/economy/quote` accepts optional `circuit` and `output_mode`
 (same shapes as submit). Empty `output_mode` is `statevector_scalar`. With no circuit,
 the stand-in width for a scalar is 2048 qubits (one `χ = 128` MPS in 1 GiB). With a
-circuit, the estimate follows the table above. A walk that hits a ceiling returns HTTP
+circuit whose exact tree fits, the estimate is one slice
+([`contraction-tree.md`](contraction-tree.md)). Otherwise the estimate follows the
+table above. A walk that hits a ceiling returns HTTP
 400 ([`economics.md`](economics.md) §3.1).
 
 **Submit / Start.** Submit rejects a saturated scalar before locking quorum. If the
@@ -188,8 +200,9 @@ The core accepts it only for `statevector_scalar`, with no `slice_assignments`, 
 ### 5.5 Cost
 
 Fees follow [`economics.md`](economics.md): the scalar `VRAM_MiB` uses the **boundary** MPS
-bond (the larger half), and the gate count is that of the whole circuit. Coefficients are
-unchanged.
+bond (the larger half), and the gate count is that of the whole circuit. A tree-carrying
+scalar uses the tree peak instead ([`contraction-tree.md`](contraction-tree.md) §6).
+Coefficients are unchanged.
 
 ## 6. Determinism and quorum
 
@@ -277,13 +290,14 @@ orchestrator's verifier accepts proofs up to 32 MiB.
 | Overlap environment above 256 | Boundary bonds above 16 on both sides | Planning bug |
 | `overlap segment failed AIR verification before prove` | The claimed amplitude does not match the claimed tensors | Core bug |
 | Orchestrator: `overlap tail required for mps_time_split subtask` | The node omitted the tail | Misbehaving or old node |
-| Older node rejects dispatch signature | `mps_time_split` set, node does not know the field | Rollout order |
+| Older node rejects dispatch signature | `mps_time_split` set, or a contraction tree is attached, and the node does not know that suffix | Rollout order |
 | Quote / submit: work-ceiling rejection | Estimate hit `2^30` / walk / gate / qubit caps (§4) | Client or circuit too large |
 | Task failed: `scalar slice estimate exceeded the work ceiling` | `Start` refused a saturated estimate | Same as above; escrow finalized |
 
 ## 9. Open gaps
 
-What this document describes is implemented. The following are still out of scope:
+A scalar whose greedy tree fits is specified in [`contraction-tree.md`](contraction-tree.md).
+This document is the scalar that has no tree. The following remain out of scope:
 
 - **Circuit-to-MPS binding.** See §7.3. Amplitude for a time-split scalar stays quorum-backed.
 - **Leaf-compose proofs.** A Born or trajectory leaf-composition proof is verified on its
@@ -293,5 +307,4 @@ What this document describes is implemented. The following are still out of scop
   verifier limit.
 - **Non-scalar modes.** Expectation and sample counts still go through a dense statevector
   (≤ 20 qubits); Born on MPS is not implemented.
-- **Planner scope.** No global contraction planning (cotengra-style), no non-pruned core
-  execution, and WebGPU is not the default.
+- **Planner scope.** No search over contraction orders, and WebGPU is not the default.

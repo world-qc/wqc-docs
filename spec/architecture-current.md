@@ -2,10 +2,10 @@
 
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-08-19
-- **Verified against:** `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
+- **Verified:** 2026-11-01
+- **Verified against:** uncommitted `feature/contraction-tree` in `wqc-orchestrator` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
-- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
+- **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`contraction-tree.md`](contraction-tree.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
 > This document describes the **current** WQC stack as implemented: a single orchestrator,
 > a permissionless worker swarm, a remote composer that seals a root STARK, and optional
@@ -131,7 +131,7 @@ sequenceDiagram
 
 1. **Submit.** `POST /api/v1/submit` on the orchestrator. Optional escrow. Returns `task_id`. Poll `GET /api/v1/task/{id}`.
 2. **Announce / bid.** Signed `TaskAnnouncement` over GossipSub (with a connected-peer stream fallback). Nodes bid; the orchestrator locks a quorum-sized worker set.
-3. **Cut + dispatch.** Compact-register slices (`qubit_count = N-C` after fixing $C$ tensor legs, pruned circuit, `circuit_id` = SHA3-256 of that JSON). Signed `SubTask` to winners. One in-flight sub-task per node process.
+3. **Cut + dispatch.** A scalar whose exact tree fits is one full-register slice: empty assignments, parent wire numbers, `circuit_id` of that parent circuit, and `contraction_tree` on the signed sub-task ([`contraction-tree.md`](contraction-tree.md)). Every other task is a compact-register slice (`qubit_count = N-C` after fixing $C$ tensor legs, pruned circuit, `circuit_id` = SHA3-256 of that JSON). Signed `SubTask` to winners. One in-flight sub-task per node process.
 4. **Compute + prove.** Node calls core `/compute`. Core contracts the slice and proves a v2 leaf STARK in-process, then the node returns result + proof on the result stream.
 5. **Quorum.** Orchestrator FFI-verifies the leaf. Scalar and expectation values snap to a 1e-6 grid, then match exactly; `sample_counts` must match exactly under the orchestrator-issued seed. A trapdoor audit compares the returned scalar with the golden simulation on that same grid.
 6. **Leaf PCS.** Winner is nominated to build a leaf PCS bundle. Majority refuse (memory gate) can failover, then an optional PCS open call (CAS upload + swarm bid). Exhaustion falls through to composer building missing PCS during compose. Completeness is required for the RecAgg v6 fast path; without it, compose falls through to the AggregationAir audit walk.
@@ -159,8 +159,9 @@ economics receipt is published.
 1. **Quote** — `POST /api/v1/economy/quote` estimates escrow from qubit/gate count, optional `circuit` / `output_mode`, `security_level`, and current BaseFee:
    ```
    // sample_counts / expectation: compact-register BFS upper bound (target 26)
-   // statevector_scalar (empty mode): MPS stand-in width 2048; with circuit,
-   //   estimated_slices follows the cutwidth / time-split walk (see economics.md §3.1)
+   // statevector_scalar with a fitting exact tree: estimated_slices = 1,
+   //   VRAM_MiB = ceil(peak_bytes / 2^20) (contraction-tree.md)
+   // otherwise: MPS stand-in width 2048; with a circuit, the cutwidth / time-split walk
    estimated_slices = max(1, 2^(qubits - target_width))   // no-circuit stand-in
    fri_bps          = fri_queries × 10000 / 16  // low 8, normal 16, high 32, ultra 40
    TotalFee         = Gas × BaseFee × 10^9 × fri_bps / 10000

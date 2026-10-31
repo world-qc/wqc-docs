@@ -80,7 +80,7 @@ The STARK subsystem guards against malicious worker behaviors, specifically targ
 
 | Output Mode | Primary Leaf Claim | Auxiliary Binding Obligation |
 | --- | --- | --- |
-| `statevector_scalar` | Unitary contraction of a target amplitude scalar. | None. |
+| `statevector_scalar` | Unitary contraction of a target amplitude scalar. | None. An exact contraction tree adds no segment; the amplitude stays outside the AIR ([`contraction-tree.md`](contraction-tree.md) §7). |
 | `sample_counts` (Terminal) | Unitary state evolution of the measured sub-circuit. | Born rule distribution commitment + deterministic PRNG sampling. |
 | `sample_counts` (Mid-Circuit) | Unitary segment traces bounded by measurement gates. | Sequential trajectory event stream + zk marginal/shot proofs. |
 | `expectation` | Algebraic expectation calculation over contracted state. | Result payload digest binding. |
@@ -149,7 +149,7 @@ To prevent proof-swapping attacks, every leaf proof commits to a rigid `StarkCon
 
 | Field Identifier | Enforcement | Functional Description |
 | --- | --- | --- |
-| `circuit_id` | Mandatory | SHA3-256 hash of the canonical pruned circuit specification. |
+| `circuit_id` | Mandatory | SHA3-256 of the canonical circuit JSON. A branched slice hashes the pruned compact circuit. An exact-tree dispatch has empty assignments, so the prune is the identity and the hash is of the parent circuit ([`contraction-tree.md`](contraction-tree.md)). |
 | `sub_task_id` | Mandatory | Unique task dispatch identifier assigned by the Orchestrator. |
 | `node_id` | Mandatory | Cryptographic identifier of the worker node generating the proof. |
 | `slice_id` | Mandatory | Binary tree path designating tensor cut / idle-wire partition. |

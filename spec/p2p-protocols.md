@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-08-29
-- **Verified against:** `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified:** 2026-11-01
+- **Verified against:** uncommitted `feature/contraction-tree` in `wqc-orchestrator` and `wqc-node` (`contraction_tree` suffix). Prior snapshot: `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -182,13 +182,25 @@ mps_site_order       count x uint32 BE
 security_level_len   uint32 BE
 security_level       []byte
 mps_time_split       uint32 BE   (omitted when 0)
+contraction_tree_len uint32 BE   (omitted when the task has no tree)
+contraction_tree     []byte      (JSON; omitted together with the length)
 ```
 
-Scalar-only tasks send zero or empty for `output_mode`, `shots`, `classical_bit_count`,
-and `sample_seed`. An empty `mps_site_order` means identity. An empty `security_level`
-means the FRI default. `mps_time_split` is the gate index that splits a scalar into two
-MPS sweeps. It is omitted when zero so an older node still verifies ordinary dispatches;
-a node that does not know the field rejects only time-split tasks.
+Scalar tasks carry `statevector_scalar` for `output_mode`; `shots`,
+`classical_bit_count`, and `sample_seed` are unused and normally zero. The
+orchestrator stores an empty client mode as `statevector_scalar` before
+dispatch. An empty `mps_site_order` means identity. An empty `security_level`
+means the FRI default. `mps_time_split` is the gate index that splits a scalar
+into two MPS sweeps. It is omitted when zero so an older node still verifies
+ordinary dispatches; a node that does not know the field rejects only
+time-split tasks. `contraction_tree` is the exact-tree JSON from
+[`contraction-tree.md`](contraction-tree.md). Both the length and the JSON are
+omitted when the task has no tree, so those dispatches stay byte-identical. A
+tree task has `mps_time_split` zero, so the suffix starts at
+`contraction_tree_len`. An older node rejects only that signature. The JSON
+keys are in struct order (`nodes`, `peak_bytes`, then each node's `op`, `left`,
+`right`). One qubit of `H` is
+`{"nodes":[{"op":"contract","left":{"ket0":0},"right":{"gate":0}}],"peak_bytes":32}`.
 
 **`PcsRequest`** — signed by the orchestrator:
 
@@ -334,8 +346,9 @@ compute but has no payout binding.
 }
 ```
 
-Circuit indices here are **local to the compact register**, already pruned and remapped
-from the client's global indices. Gate grammar is in
+Circuit indices on a branched slice are **local to the compact register**, already pruned and remapped
+from the client's global indices. An exact-tree dispatch keeps parent wire numbers and
+carries `contraction_tree` ([`contraction-tree.md`](contraction-tree.md)). Gate grammar is in
 [`circuit-payload.md`](circuit-payload.md) — note in particular that the dispatch wire
 uses the array form for single-parameter gates, while `wqc-core` requires the bare form,
 so a node must normalize before calling `/compute`.

@@ -25,7 +25,7 @@ All fee, reward, burn, and escrow amounts are **Planck integers**. No floating-p
 
 ## 2. Billing unit and gas
 
-The atomic billing unit is one **sub-task** (one compact-register slice execution + one leaf STARK).
+The atomic billing unit is one **sub-task** (one slice execution + one leaf STARK). An exact-tree scalar slice is the full parent register ([`contraction-tree.md`](contraction-tree.md)). Every other slice is a compact register.
 
 ```
 Gas_quantum = α·VRAM_MiB + β·GateCount + γ·TraceRows
@@ -40,7 +40,7 @@ R_net       = R_compute + R_pcs               (80%, worker budget)
 
 | Symbol | Meaning | Normative source |
 | --- | --- | --- |
-| `VRAM_MiB` | Peak workspace size | Scalar (`statevector_scalar`, or empty): $\lceil N \chi^{2} \times 32 / 2^{20} \rceil$ with $\chi = \min(\mathrm{task}, 128)$ (task χ 0 means 128). `sample_counts` and `expectation`: $\lceil 2^{q} \times 16 / 2^{20} \rceil$ for compact width $q$ |
+| `VRAM_MiB` | Peak workspace size | Scalar with an exact tree ([`contraction-tree.md`](contraction-tree.md)): $\lceil \mathrm{peak\_bytes} / 2^{20} \rceil$. Other scalar (`statevector_scalar`, or an empty `output_mode`) with no tree: $\lceil N \chi^{2} \times 32 / 2^{20} \rceil$ with $\chi = \min(\mathrm{task}, 128)$ (task χ 0 means 128). `sample_counts` and `expectation`: $\lceil 2^{q} \times 16 / 2^{20} \rceil$ for compact width $q$ |
 | `GateCount` | Pruned gate list length | Length of the dispatched circuit |
 | `TraceRows` | STARK execution trace rows | Attested in the work report (fallback: $\max(4, \mathrm{GateCount}+1)$) |
 | `BaseFee` | WQC per gas, stored as sWQC | Locked per parent task at submit; may adjust globally between tasks |
@@ -97,7 +97,7 @@ per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)
 escrow           = estimated_slices × per_slice × safety_factor
 ```
 
-For `sample_counts` and `expectation`, `target_width` is the compact-register BFS threshold used by the slice scheduler (implementation default 26). A scalar task (`statevector_scalar`, or empty `output_mode`) does not use `2^(qubits - 26)`. With no circuit, the stand-in width is 2048 qubits (one χ=128 MPS in 1 GiB). With a circuit, `estimated_slices` follows the MPS cutwidth walk along the parent site order (see [`mps-scalar.md`](mps-scalar.md) §§4–5). The node is given that same order: fixed qubits are removed and the survivors are packed into the compact register. It does not recompute a new order on the pruned circuit. A cut crossed by w two-qubit gates, with m sites on its smaller side, has width `2^min(w, m)`. A one-site side stays at width 2 however many gates touch that qubit. A nearest-neighbor chain whose cuts stay at or below χ is one slice. When cutwidth exceeds χ=128 and a time split still fits both halves under the overlap budget (χ≤16, or ≤8 with swap margin), the estimate stays one slice. Branching (two or more slices) happens only when cutwidth exceeds χ and no time split fits. When every cut is within χ, the only split is memory: one slice at or below 2048 qubits, and `2^(qubits − 2048)` above that. That power is rejected when it reaches 2^30 (2078 qubits and above). A walk that is still above χ stops at 4096 nodes. The walk also refuses more than 100000 gates or 4096 qubits, then reports 2^30. A quote or submit of a scalar circuit that hits any of those ceilings is rejected. The quote gate and qubit check applies to every output mode. Stragglers do not increase the escrow bound; they draw from deferred burn.
+For `sample_counts` and `expectation`, `target_width` is the compact-register BFS threshold used by the slice scheduler (implementation default 26). A scalar task (`statevector_scalar`, or empty `output_mode`) does not use `2^(qubits - 26)`. With no circuit, the stand-in width is 2048 qubits (one χ=128 MPS in 1 GiB). With a circuit whose exact tree fits, `estimated_slices` is 1 and `VRAM_MiB` is the tree peak ([`contraction-tree.md`](contraction-tree.md)); that quote is not saturated, including when the cutwidth walk would hit a ceiling. Otherwise, with a circuit, `estimated_slices` follows the MPS cutwidth walk along the parent site order (see [`mps-scalar.md`](mps-scalar.md) §§4–5). On that walk, and only on that walk, the node is given the parent site order: fixed qubits are removed and the survivors are packed into the compact register. It does not recompute a new order on the pruned circuit. A tree dispatch leaves `mps_site_order` empty. A cut crossed by w two-qubit gates, with m sites on its smaller side, has width `2^min(w, m)`. A one-site side stays at width 2 however many gates touch that qubit. A nearest-neighbor chain whose cuts stay at or below χ is one slice. When cutwidth exceeds χ=128 and a time split still fits both halves under the overlap budget (χ≤16, or ≤8 with swap margin), the estimate stays one slice. Branching (two or more slices) happens only when cutwidth exceeds χ and no time split fits. When every cut is within χ, the only split is memory: one slice at or below 2048 qubits, and `2^(qubits − 2048)` above that. That power is rejected when it reaches 2^30 (2078 qubits and above). A walk that is still above χ stops at 4096 nodes. The walk also refuses more than 100000 gates or 4096 qubits, then reports 2^30. A quote or submit of a scalar circuit that hits any of those ceilings is rejected. The quote gate and qubit check applies to every output mode. Stragglers do not increase the escrow bound; they draw from deferred burn.
 
 ---
 
@@ -176,5 +176,6 @@ A 50-qubit scalar slice at χ = 128 has workspace $\lceil 50 \times 128^{2} \tim
 
 - [`architecture.md`](architecture.md) §6–8 — trust, settlement contract, migration
 - [`architecture-current.md`](architecture-current.md) §4 — live Redis / env / HTTP / receipt wiring
+- [`contraction-tree.md`](contraction-tree.md) — scalar whose `VRAM_MiB` is the tree peak and whose `estimated_slices` is 1
 - [`zk-SNARK.md`](zk-SNARK.md) — SNARK wrap for on-chain validity finalize
 - [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md) §4 — supply, burn narrative, vesting
