@@ -18,6 +18,7 @@ The HTTP API reference is rendered at **<https://world-qc.github.io/wqc-docs/>**
 | [`/spec/architecture-current.md`](spec/architecture-current.md) | Working spec | B | Live implementation map: daemons, trust boundaries, task lifecycle |
 | [`/spec/circuit-payload.md`](spec/circuit-payload.md) | Working spec | B | Circuit payload meaning: gate grammar, measurement, output modes, determinism, scale limits |
 | [`/spec/mps-scalar.md`](spec/mps-scalar.md) | Working spec | B | Scalar slice via MPS: cutwidth, time split, overlap tail, quote ceilings |
+| [`/spec/contraction-tree.md`](spec/contraction-tree.md) | Working spec | B | Exact scalar contraction tree: greedy plan, 26-leg / 1 GiB peak, signed suffix, quorum amplitude |
 | [`/spec/OpenQASM.md`](spec/OpenQASM.md) | Working spec | B | OpenQASM 2.0/3.0 linear subset: what submit accepts, and what it refuses |
 | [`/spec/p2p-protocols.md`](spec/p2p-protocols.md) | Working spec | B | Swarm libp2p wire contract: protocol IDs, framing, signature payload layouts, message shapes |
 | [`/spec/zk-STARK.md`](spec/zk-STARK.md) | Present | A | zk-STARK protocol specification (narrative + normative appendices) |
