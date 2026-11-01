@@ -3,7 +3,7 @@
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-01
-- **Verified against:** uncommitted `feature/contraction-tree` in `wqc-orchestrator` and `wqc-node` (`contraction_tree` suffix). Prior snapshot: `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified against:** `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix). Prior snapshot: `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 

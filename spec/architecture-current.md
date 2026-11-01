@@ -3,7 +3,7 @@
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-01
-- **Verified against:** uncommitted `feature/contraction-tree` in `wqc-orchestrator` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
+- **Verified against:** `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
 - **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`contraction-tree.md`](contraction-tree.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 

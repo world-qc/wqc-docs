@@ -3,7 +3,7 @@
 - **Status:** Working spec — scalar slice contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-01
-- **Verified against:** uncommitted `feature/contraction-tree` in `wqc-orchestrator`, `wqc-node`, and `wqc-core` (tree handoff). MPS path prior snapshot: `wqc-orchestrator@220d17f` `wqc-core@7c721e2` `wqc-node@096dcf4` `wqc-stark-engine@12bfb3c`
+- **Verified against:** `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree` (tree handoff). MPS path prior snapshot: `wqc-orchestrator@220d17f` `wqc-core@7c721e2` `wqc-node@096dcf4` `wqc-stark-engine@12bfb3c`
 - **Audience:** Implementers of the scheduler, node and core; reviewers of quorum and proof claims
 - **Related:** [`circuit-payload.md`](circuit-payload.md) (output modes, determinism), [`contraction-tree.md`](contraction-tree.md) (scalar with an exact tree), [`p2p-protocols.md`](p2p-protocols.md) (wire layouts), [`economics.md`](economics.md) (fees and escrow), [`zk-STARK.md`](zk-STARK.md) (proof format), `wqc-core/doc/tn-engine.md` (module layout, WebGPU, env vars)
 
