@@ -3,7 +3,7 @@
 - **Status:** Working spec — scalar tree contract (state tree and network tree)
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-03
-- **Verified against:** `wqc-orchestrator`, `wqc-node`, `wqc-core` on `feature/network-contraction`. Prior snapshot: `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
+- **Verified against:** `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`. Prior snapshot: `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
 - **Audience:** Implementers of the scheduler, node, and core; reviewers of quorum, fees, and proof claims
 - **Related:** [`mps-scalar.md`](mps-scalar.md) (the path with no tree), [`economics.md`](economics.md) (fees), [`p2p-protocols.md`](p2p-protocols.md) (signed bytes), [`zk-STARK.md`](zk-STARK.md) (what the proof binds), [`architecture-current.md`](architecture-current.md) (who dispatches)
 
