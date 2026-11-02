@@ -198,9 +198,15 @@ time-split tasks. `contraction_tree` is the exact-tree JSON from
 omitted when the task has no tree, so those dispatches stay byte-identical. A
 tree task has `mps_time_split` zero, so the suffix starts at
 `contraction_tree_len`. An older node rejects only that signature. The JSON
-keys are in struct order (`nodes`, `peak_bytes`, then each node's `op`, `left`,
-`right`). One qubit of `H` is
-`{"nodes":[{"op":"contract","left":{"ket0":0},"right":{"gate":0}}],"peak_bytes":32}`.
+keys are in struct order (`kind` when set, `nodes`, `peak_bytes`, then each
+node's `op`, `left`, `right`, and each operand's one key out of `ket0`, `gate`,
+`node`, `bra0`). One qubit of `H` as a state tree is
+`{"nodes":[{"op":"contract","left":{"ket0":0},"right":{"gate":0}}],"peak_bytes":32}`,
+and as a network tree is
+`{"kind":"network","nodes":[{"op":"contract","left":{"ket0":0},"right":{"gate":0}},{"op":"contract","left":{"bra0":0},"right":{"node":0}}],"peak_bytes":128}`.
+The node re-encodes the tree it decoded before it checks the signature, so it
+must know every key: a node without `kind` and `bra0` rejects every network
+tree task.
 
 **`PcsRequest`** — signed by the orchestrator:
 
