@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-03
-- **Verified against:** `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys). Prior snapshot: `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified:** 2026-11-04
+- **Verified against:** `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3). Prior snapshot: `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -200,13 +200,14 @@ tree task has `mps_time_split` zero, so the suffix starts at
 `contraction_tree_len`. An older node rejects only that signature. The JSON
 keys are in struct order (`kind` when set, `nodes`, `peak_bytes`, then each
 node's `op`, `left`, `right`, and each operand's one key out of `ket0`, `gate`,
-`node`, `bra0`). One qubit of `H` as a state tree is
+`node`, `bra0`, `control`, `target`). One qubit of `H` as a state tree is
 `{"nodes":[{"op":"contract","left":{"ket0":0},"right":{"gate":0}}],"peak_bytes":32}`,
 and as a network tree is
 `{"kind":"network","nodes":[{"op":"contract","left":{"ket0":0},"right":{"gate":0}},{"op":"contract","left":{"bra0":0},"right":{"node":0}}],"peak_bytes":128}`.
 The node re-encodes the tree it decoded before it checks the signature, so it
 must know every key: a node without `kind` and `bra0` rejects every network
-tree task.
+tree task. A tree that takes a gate as `control` and `target` halves is sent
+only to nodes whose bid carries `supported_features` bit 3 (below).
 
 **`PcsRequest`** — signed by the orchestrator:
 
@@ -277,6 +278,14 @@ over `/wqc/task-announce/1.0.0`.
 
 `required_features` is a gate-capability bitmask. A node derives its own mask from
 `wqc-core` `GET /gates` at startup and skips announcements it cannot execute.
+
+| Bit | Name | Set by the node when `/gates` lists | Required by the orchestrator when |
+|-----|------|-------------------------------------|-----------------------------------|
+| `1 << 0` | standard gates | `H`, `X`, `Y`, `Z`, `S`, `T`, `CNOT`, `CZ`, `CCNOT` | the circuit has one of those, `MEASURE`, `RESET`, or `IF`, or nothing else applies |
+| `1 << 1` | rotations | `RX`, `RY`, `RZ` | the circuit has a rotation |
+| `1 << 3` | network gate split | `NETWORK_GATE_SPLIT` | the attached network tree takes a gate as halves ([`contraction-tree.md`](contraction-tree.md) §5) |
+
+Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
 
 ## 5. Bid
 
