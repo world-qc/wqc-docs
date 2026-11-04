@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — scalar tree contract (state tree and network tree)
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-03
-- **Verified against:** `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`. Prior snapshot: `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
+- **Verified:** 2026-11-04
+- **Verified against:** `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3). Prior snapshot: `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
 - **Audience:** Implementers of the scheduler, node, and core; reviewers of quorum, fees, and proof claims
 - **Related:** [`mps-scalar.md`](mps-scalar.md) (the path with no tree), [`economics.md`](economics.md) (fees), [`p2p-protocols.md`](p2p-protocols.md) (signed bytes), [`zk-STARK.md`](zk-STARK.md) (what the proof binds), [`architecture-current.md`](architecture-current.md) (who dispatches)
 
@@ -14,7 +14,9 @@ attaches an **exact contraction tree**. There are two kinds:
 
 - a **state tree** contracts gates into state tensors in circuit order (§3.1);
 - a **network tree** (`"kind":"network"`) closes every wire with `⟨0|` and
-  contracts the whole circuit as one tensor network, in any order (§3.2).
+  contracts the whole circuit as one tensor network, in any order (§3.2). It
+  may take a `CNOT` or `CZ` as two halves joined by a bond (§3.2), which only
+  nodes with the `NETWORK_GATE_SPLIT` capability run (§5).
 
 It covers:
 
@@ -87,7 +89,9 @@ Examples, nearest neighbour unless noted. Peaks are `peak_bytes`.
 | 50q depth-8 RY+CNOT brickwork | does not fit | 95488 | network | 1 slice |
 | 50q depth-16 RY+CNOT brickwork | does not fit | 17367040 | network | 1 slice. Without the tree it would time-split at boundary bond 16 |
 | 50q, one `H` on each wire | 1600 | 1696 | state | 1 slice |
-| 1D 30q depth-32 RY+RZ+CNOT brickwork | does not fit | does not fit | none | the cutwidth walk (256 slices) |
+| 1D 30q depth-32 RY+RZ+CNOT brickwork | does not fit | 8388736, split | network | 1 slice. The cutwidth walk would take 256 |
+| 1D 100q depth-32 RY+RZ+CNOT brickwork | does not fit | 8388736, split | network | 1 slice |
+| 2D 8×8 depth-12 RY+RZ+CNOT grid | does not fit | does not fit | none | the cutwidth walk (saturates at `2^30`) |
 
 Wherever a time split fits (boundary bond at most χ=128), a network tree has
 fitted in every circuit measured so far, so the time split and the cutwidth
@@ -113,10 +117,10 @@ tree of the same circuit is:
 |--------|----------------|---------|
 | tree | `kind`, `nodes`, `peak_bytes` | `kind` is `network` or absent (state tree). Contractions, then the declared live peak in bytes |
 | node | `op`, `left`, `right` | `op` is `contract` |
-| operand | one of `ket0`, `gate`, `node`, `bra0` | Parent wire of a `\|0⟩` leaf, index in the parent circuit, earlier node, or parent wire of a `⟨0\|` leaf (network only) |
+| operand | one of `ket0`, `gate`, `node`, `bra0`, `control`, `target` | Parent wire of a `\|0⟩` leaf, index in the parent circuit, earlier node, parent wire of a `⟨0\|` leaf (network only), or the parent-circuit index of a `CNOT` or `CZ` taken as its first-wire or second-wire half (network only) |
 
-`gate` counts every gate, including `MEASURE`, `RESET`, and `IF`, which are not
-themselves nodes. A circuit with no unitary is `{"nodes":[],"peak_bytes":0}`.
+`gate`, `control`, and `target` count every gate, including `MEASURE`,
+`RESET`, and `IF`, which are not themselves nodes. A circuit with no unitary is `{"nodes":[],"peak_bytes":0}`.
 `site_order` is not a field. Wire numbers are the parent circuit's.
 
 A state tensor is a dense array of open parent wires. Bit `i` of the index is
@@ -176,6 +180,19 @@ in argument order; `bra0(w)` holds the last edge of wire `w`. A wire no gate
 touches is `ket0(w)` against `bra0(w)`, a factor of 1. The tree names leaves
 only. Core numbers the edges the same way.
 
+**Gate halves.** A `CNOT` or `CZ` at circuit index `i` may instead enter as
+two leaves, `control(i)` and `target(i)`, joined by a bond edge numbered
+`E + i`, where `E` is the number of wire edges above (the qubit count plus
+the outputs of every unitary). Each half has three legs: its wire's input,
+its wire's output, then the bond. `control(i)` is the first argument's wire
+and is 1 where input, output, and bond are equal, 0 elsewhere. `target(i)` is
+the second argument's wire: the identity when the bond is 0, and `X` (`CNOT`)
+or `Z` (`CZ`) when it is 1. Summed over the bond, the two halves are the gate.
+A tree takes each gate either whole or as both halves. `CCNOT` and
+one-wire gates have no halves. A cut through the wires then crosses one bond
+per two-wire gate rather than two wire edges, which roughly halves the widest
+tensor of a sweep (below).
+
 **Layout.** Leg `p` of a tensor is bit `p` of its index. A gate leaf's entry is
 `input | output << k`, where `input` and `output` are `k`-bit indices in
 argument order. Before a contraction, each operand is reordered so the shared
@@ -205,7 +222,30 @@ the smaller peak, then the earlier pass. Every bound is a count, never the
 clock: a pass stops once its flops pass the best so far; the search stops when
 the best tree's flops fall below 10^4 per leaf searched so far; and the passes
 together see at most 600000 leaves. Quote, submit, and `Start` therefore build
-the same tree. When no order fits, there is no network tree.
+the same tree.
+
+**Split candidates.** The search above runs on whole gates first. When it
+finds no tree, or its best tree takes at least 10^4 flops per leaf, and the
+circuit has a `CNOT` or `CZ`, the planner builds the leaves again with every
+`CNOT` and `CZ` split and tries three more orders:
+
+1. the forward sweep: every leaf joins one growing tensor, ordered by the
+   highest wire it touches, then by leaf id (split leaves are listed as
+   `ket0` by wire, then each gate in circuit order, with a split gate as
+   `control` then `target`, then `bra0` by wire);
+2. the reverse sweep: ordered by the lowest wire it touches, highest first,
+   then by leaf id;
+3. the search above, run on the split leaves.
+
+A sweep joins its first two leaves, then each next leaf into the result, even
+when they share no edge. Its widest tensor depends on the circuit's depth, not
+its width: on a 1D brickwork of depth `d` it is about `d/2 + 2` legs with
+split gates (`d + 3` without). Among all candidates that fit, whole and split,
+the plan keeps the fewest flops, then the smaller peak, then the earlier of:
+the whole-gate search, the forward sweep, the reverse sweep, the split search.
+A cheap circuit therefore keeps its whole-gate tree and needs no new node
+capability. When no candidate fits, there is no network tree, and the reason
+reported is the whole-gate plain greedy's.
 
 The orchestrator keeps up to 64 results in memory (at most 2^18 tree nodes in
 all) and drops the least recently used. The cache key hashes each leaf's kind
@@ -216,13 +256,21 @@ trees name different gate indices.
 Measured on nearest-neighbour RY+RZ+CNOT circuits (the search time is the
 orchestrator's):
 
-| Circuit | Plain greedy peak | Searched peak | Search |
-|---------|------------------:|--------------:|-------:|
-| 1D 50q depth-8 RY+RZ+CNOT | 95488 | same tree | 1 ms |
-| 1D 50q depth-16 RY+RZ+CNOT | 71.3 MB | 9.0 MB | 26 ms |
-| 1D 30q depth-24 RY+RZ+CNOT | does not fit | 326 MB | 0.85 s |
-| 2D 7×7 depth-8 RY+RZ+CNOT | does not fit | 306 MB | 0.39 s |
-| 1D 30q depth-32 RY+RZ+CNOT | does not fit | does not fit | 1.1 s |
+| Circuit | Plain greedy peak | Whole-gate search peak | Attached peak | Planning |
+|---------|------------------:|-----------------------:|--------------:|---------:|
+| 1D 50q depth-8 RY+RZ+CNOT | 95488 | same tree | same, whole | 1 ms |
+| 1D 30q depth-24 RY+RZ+CNOT | does not fit | 326 MB | 524416, split | 0.85 s |
+| 2D 7×7 depth-8 RY+RZ+CNOT | does not fit | 306 MB | 8388736, split | 0.49 s |
+| 1D 30q depth-32 RY+RZ+CNOT | does not fit | does not fit | 8388736, split | 2.0 s |
+| 1D 100q depth-32 RY+RZ+CNOT | does not fit | does not fit | 8388736, split | 2.3 s |
+| 2D 8×8 depth-8 RY+RZ+CNOT | does not fit | does not fit | 33554560, split | 1.1 s |
+| 2D 10×10 depth-8 RY+RZ+CNOT | does not fit | does not fit | 536871040, split | 1.7 s |
+| 2D 7×7 depth-12 RY+RZ+CNOT | does not fit | does not fit | does not fit | 1.2 s |
+| 2D 8×8 depth-12 RY+RZ+CNOT | does not fit | does not fit | does not fit | 1.7 s |
+
+On an Apple M-series laptop (release build), core contracts the 1D depth-32 split sweep in
+0.8 s at 30 qubits and 2.6 s at 100 qubits, and a 100-qubit depth-40 sweep
+(134217856 bytes) in 49 s.
 
 ## 4. Executor
 
@@ -236,7 +284,9 @@ site order, and that a peak is declared and at most 1 GiB. It then walks the
 tree without data. The walk checks leg count and measures the live peak. For a
 state tree it checks that each gate is consumed in circuit order. For a network
 tree it builds the network as in §3.2, checks that each leaf is used once and
-the root has no legs, and measures the peak by the rule in §3.2. The declared
+the root has no legs, and measures the peak by the rule in §3.2. A half of a
+gate that is not a `CNOT` or `CZ`, a gate taken both whole and as a half, a
+half used twice, and a gate with only one half used are all rejected. The declared
 peak must equal that measurement. The contraction checks it again. A declaration of 32 bytes on a walk that measures
 1310784 bytes is HTTP 400, even though both values are within 1 GiB.
 A tree-shape or budget failure, including this mismatch, is HTTP 400.
@@ -272,6 +322,21 @@ re-encodes different bytes, and rejects the signature of every network tree
 task. Network trees therefore ship after the node (no capability bit: there are
 no external miners yet).
 
+Gate halves do have a capability bit. Core lists `NETWORK_GATE_SPLIT` after
+its gates in `GET /gates` (so that list mixes gate names with one capability
+token, and a node's status `supported_gates` shows it too); a node that reads it sets
+`supported_features` bit 3 (`1 << 3`). When the tree `Start` will attach (submit
+plans the same one) takes any gate as halves, the orchestrator sets bit 3 in the task's `required_features`, so a
+node whose core cannot run halves, or which does not know the `control` and
+`target` keys, does not bid. Such a node would otherwise re-encode the tree
+without those keys and reject its signature.
+
+A task whose whole-gate tree also fits can still get a split tree (§3.2, for
+example 1D 30q depth 24), and then needs bit 3. In a swarm where no bidder
+has bit 3, such a task gets no bids, although a whole-gate tree would have
+run. The orchestrator does not fall back to the whole-gate tree. Shipping
+nodes before the orchestrator avoids this while every node is ours.
+
 The node checks that signature and copies `contraction_tree` onto
 `POST /compute`. It does not build another tree. Omitting the field on
 `/compute` keeps today's `contract_slice` path.
@@ -305,8 +370,10 @@ trust as a time-split amplitude, and it is not a proof of a general circuit.
 
 ## 8. Out of scope
 
-- Slicing a network tree's edges when no order fits in 26 legs or 1 GiB. Such
-  a circuit stays on the MPS path (§1).
+- Slicing a network tree's edges when no order fits in 26 legs or 1 GiB, even
+  with split gates (for example a 2D 7×7 or 8×8 grid at depth 12). Such a
+  circuit stays on the MPS path (§1).
+- Splitting `CCNOT`, or any gate other than `CNOT` and `CZ`.
 - Any cotengra-shaped planner (hypergraph partitioning, simulated annealing
   over trees).
 - Born-rule or expectation values on this tree. Those modes stay dense, host
