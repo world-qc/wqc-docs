@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — scalar tree contract (state tree and network tree)
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-04
-- **Verified against:** `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3). Prior snapshot: `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
+- **Verified:** 2026-11-06
+- **Verified against:** `wqc-orchestrator@6d6dc15` `wqc-core@1fd4b1b` on `feature/bisection-order` (bisection candidate). Prior snapshot: `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
 - **Audience:** Implementers of the scheduler, node, and core; reviewers of quorum, fees, and proof claims
 - **Related:** [`mps-scalar.md`](mps-scalar.md) (the path with no tree), [`economics.md`](economics.md) (fees), [`p2p-protocols.md`](p2p-protocols.md) (signed bytes), [`zk-STARK.md`](zk-STARK.md) (what the proof binds), [`architecture-current.md`](architecture-current.md) (who dispatches)
 
@@ -227,7 +227,7 @@ the same tree.
 **Split candidates.** The search above runs on whole gates first. When it
 finds no tree, or its best tree takes at least 10^4 flops per leaf, and the
 circuit has a `CNOT` or `CZ`, the planner builds the leaves again with every
-`CNOT` and `CZ` split and tries three more orders:
+`CNOT` and `CZ` split and tries four more orders:
 
 1. the forward sweep: every leaf joins one growing tensor, ordered by the
    highest wire it touches, then by leaf id (split leaves are listed as
@@ -235,17 +235,37 @@ circuit has a `CNOT` or `CZ`, the planner builds the leaves again with every
    `control` then `target`, then `bra0` by wire);
 2. the reverse sweep: ordered by the lowest wire it touches, highest first,
    then by leaf id;
-3. the search above, run on the split leaves.
+3. the search above, run on the split leaves;
+4. the best of up to 12 recursive bisections of the split leaves (below).
 
 A sweep joins its first two leaves, then each next leaf into the result, even
 when they share no edge. Its widest tensor depends on the circuit's depth, not
 its width: on a 1D brickwork of depth `d` it is about `d/2 + 2` legs with
 split gates (`d + 3` without). Among all candidates that fit, whole and split,
 the plan keeps the fewest flops, then the smaller peak, then the earlier of:
-the whole-gate search, the forward sweep, the reverse sweep, the split search.
+the whole-gate search, the forward sweep, the reverse sweep, the split search,
+the bisection.
 A cheap circuit therefore keeps its whole-gate tree and needs no new node
 capability. When no candidate fits, there is no network tree, and the reason
 reported is the whole-gate plain greedy's.
+
+**Bisection.** First every tensor with one or two legs joins the tensor across
+its first leg, in id order, until none is left; a wire with no other tensor
+ends as a scalar. The rest is a graph: tensors are vertices, shared legs are
+edges. A set of vertices splits in two with few edges between them, each side
+holding at least `⌊(1/2 − ε)·n⌋` vertices; each side is contracted the same
+way, the first side first, and the two results join. Scalars join last, the
+smallest ids first. A split keeps the smallest cut of five starts, each
+refined by Fiduccia–Mattheyses passes: four thresholds of the two lowest
+nonconstant Laplacian modes (each mode, their sum, and their difference; on a
+square grid the two nearly coincide, so one alone may cut diagonally), and a
+breadth-first half. The modes come from inverse iteration on `L + 0.01·I`
+with conjugate gradients, from a seeded random start. Passes cycle `ε` through
+0.05, 0.15, 0.3 and draw each seed from the split leaves' SHA3-256, so the
+tree is deterministic. They stop, like the search, at 10^4 flops per leaf
+bisected, and see at most 30000 leaves in all. On a 2D grid a bisection cuts
+between rows, where few bonds cross, and so avoids the partial row a sweep
+carries; on a long 1D circuit the sweep stays better.
 
 The orchestrator keeps up to 64 results in memory (at most 2^18 tree nodes in
 all) and drops the least recently used. The cache key hashes each leaf's kind
@@ -259,18 +279,27 @@ orchestrator's):
 | Circuit | Plain greedy peak | Whole-gate search peak | Attached peak | Planning |
 |---------|------------------:|-----------------------:|--------------:|---------:|
 | 1D 50q depth-8 RY+RZ+CNOT | 95488 | same tree | same, whole | 1 ms |
-| 1D 30q depth-24 RY+RZ+CNOT | does not fit | 326 MB | 524416, split | 0.85 s |
-| 2D 7×7 depth-8 RY+RZ+CNOT | does not fit | 306 MB | 8388736, split | 0.49 s |
-| 1D 30q depth-32 RY+RZ+CNOT | does not fit | does not fit | 8388736, split | 2.0 s |
-| 1D 100q depth-32 RY+RZ+CNOT | does not fit | does not fit | 8388736, split | 2.3 s |
-| 2D 8×8 depth-8 RY+RZ+CNOT | does not fit | does not fit | 33554560, split | 1.1 s |
-| 2D 10×10 depth-8 RY+RZ+CNOT | does not fit | does not fit | 536871040, split | 1.7 s |
-| 2D 7×7 depth-12 RY+RZ+CNOT | does not fit | does not fit | does not fit | 1.2 s |
-| 2D 8×8 depth-12 RY+RZ+CNOT | does not fit | does not fit | does not fit | 1.7 s |
+| 1D 30q depth-24 RY+RZ+CNOT | does not fit | 326 MB | 524416, split sweep | 1.2 s |
+| 2D 7×7 depth-8 RY+RZ+CNOT | does not fit | 306 MB | 4503552, split bisection | 0.52 s |
+| 1D 30q depth-32 RY+RZ+CNOT | does not fit | does not fit | 8388736, split sweep | 2.3 s |
+| 1D 100q depth-32 RY+RZ+CNOT | does not fit | does not fit | 8388736, split sweep | 2.6 s |
+| 2D 6×6 depth-12 RY+RZ+CNOT | does not fit | does not fit | 41943040, split bisection | 0.97 s |
+| 2D 8×8 depth-8 RY+RZ+CNOT | does not fit | does not fit | 35258368, split bisection | 1.2 s |
+| 2D 8×8 depth-10 RY+RZ+CNOT | does not fit | does not fit | 169345024, split bisection | 1.5 s |
+| 2D 8×8 depth-11 RY+RZ+CNOT | does not fit | does not fit | 152305664, split bisection | 1.7 s |
+| 2D 10×10 depth-8 RY+RZ+CNOT | does not fit | does not fit | 536871040, split sweep | 1.9 s |
+| 2D 7×7 depth-12 RY+RZ+CNOT | does not fit | does not fit | 620756992, split bisection | 1.4 s |
+| 2D 8×8 depth-12 RY+RZ+CNOT | does not fit | does not fit | does not fit | 1.8 s |
+
+The plan keeps the fewest flops, not the smallest peak: on 8×8 depth 10
+the forward sweep peaks at 67108992 bytes with 3.3·10^9 flops, the bisection at
+169345024 with 2.8·10^9.
 
 On an Apple M-series laptop (release build), core contracts the 1D depth-32 split sweep in
 0.8 s at 30 qubits and 2.6 s at 100 qubits, and a 100-qubit depth-40 sweep
-(134217856 bytes) in 49 s.
+(134217856 bytes) in 49 s. It contracts the 8×8 depth-10 bisection in 0.97 s
+(the forward sweep takes 4.8 s; the amplitudes agree to 3·10^-15), 8×8
+depth 11 in 0.98 s, and 7×7 depth 12 in 12 s.
 
 ## 4. Executor
 
