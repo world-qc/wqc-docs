@@ -124,6 +124,22 @@ required_votes     uint32 BE
 nonce              uint64 BE
 ```
 
+**`TaskAnnouncement` v2** — an announcement with `work` is also signed over the
+v1 layout followed by its budget, in `signature_v2`
+([`work-budget.md`](work-budget.md) §3):
+
+```
+(v1 layout)
+deadline_secs      uint32 BE
+traffic_bytes      uint64 BE
+flops              uint64 BE
+```
+
+A node that reads `work` verifies `signature_v2` and drops the announcement
+when it is missing or wrong, or when `required_features` has bit 4 but `work`
+or `deadline_secs` is missing (stripping them leaves `signature` valid). An
+older node ignores the new keys and verifies `signature`.
+
 **`Bid`** — signed by the node identity key:
 
 ```
@@ -276,6 +292,11 @@ over `/wqc/task-announce/1.0.0`.
 }
 ```
 
+A task with a network tree also carries `deadline_secs`, `work`
+(`traffic_bytes`, `flops`), and `signature_v2` (§3.2), and sets bit 4. A node
+bids only if it expects to finish in time ([`work-budget.md`](work-budget.md)).
+
+
 `required_features` is a gate-capability bitmask. A node derives its own mask from
 `wqc-core` `GET /gates` at startup and skips announcements it cannot execute.
 
@@ -284,6 +305,7 @@ over `/wqc/task-announce/1.0.0`.
 | `1 << 0` | standard gates | `H`, `X`, `Y`, `Z`, `S`, `T`, `CNOT`, `CZ`, `CCNOT` | the circuit has one of those, `MEASURE`, `RESET`, or `IF`, or nothing else applies |
 | `1 << 1` | rotations | `RX`, `RY`, `RZ` | the circuit has a rotation |
 | `1 << 3` | network gate split | `NETWORK_GATE_SPLIT` | the attached network tree takes a gate as halves ([`contraction-tree.md`](contraction-tree.md) §5) |
+| `1 << 4` | work budget | — (set when core `GET /sysinfo` reports `tn_seconds_per_byte` and `tn_seconds_per_flop` within bounds) | the announcement carries `work` ([`work-budget.md`](work-budget.md)) |
 
 Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
 
