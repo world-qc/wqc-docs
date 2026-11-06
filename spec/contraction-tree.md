@@ -366,6 +366,12 @@ has bit 3, such a task gets no bids, although a whole-gate tree would have
 run. The orchestrator does not fall back to the whole-gate tree. Shipping
 nodes before the orchestrator avoids this while every node is ours.
 
+A network tree's task also announces the tree's `traffic` and `flops` as
+`work` and asks for bit 4 (`1 << 4`), so only nodes that judge whether they can
+finish it in time bid ([`work-budget.md`](work-budget.md)). `traffic` counts,
+per join, both operands and the result, plus twice an operand that must be
+reordered first.
+
 The node checks that signature and copies `contraction_tree` onto
 `POST /compute`. It does not build another tree. Omitting the field on
 `/compute` keeps today's `contract_slice` path.
