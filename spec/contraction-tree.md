@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — scalar tree contract (state tree and network tree)
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-04
-- **Verified against:** `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3). Prior snapshot: `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
+- **Verified:** 2026-11-06
+- **Verified against:** `wqc-core@7c98af3` on `feature/tree-trace-bond` (trace sweep bond cap). Prior snapshot: `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
 - **Audience:** Implementers of the scheduler, node, and core; reviewers of quorum, fees, and proof claims
 - **Related:** [`mps-scalar.md`](mps-scalar.md) (the path with no tree), [`economics.md`](economics.md) (fees), [`p2p-protocols.md`](p2p-protocols.md) (signed bytes), [`zk-STARK.md`](zk-STARK.md) (what the proof binds), [`architecture-current.md`](architecture-current.md) (who dispatches)
 
@@ -358,11 +358,18 @@ planned, the boundary bond from [`mps-scalar.md`](mps-scalar.md) §5.5.
 
 The leaf STARK is the unitary AIR of the MPS sweep ([`zk-STARK.md`](zk-STARK.md)).
 `proof_scope` stays empty. There is no overlap tail and no new auxiliary
-segment. The sweep may truncate at `mps_max_bond_dim`. That truncation does not
-change the exact amplitude this path returns, and it is not a reason to drop the
-tree. Where `χ` is below the bond the circuit needs, that exact amplitude
-differs from the value the MPS path returns. That difference is why the tree is
-attached.
+segment. Core runs that sweep at `χ = min(mps_max_bond_dim, 16)`, and it may
+truncate. That truncation does not change the exact amplitude this path
+returns, and it is not a reason to drop the tree. Where `mps_max_bond_dim` is
+below the bond the circuit needs, the MPS path would return a different value.
+That difference is why the tree is attached.
+
+The cap exists because the sweep feeds only the trace. At `χ = 128` it cost
+far more than the tree: on a 2D 8×8 depth-11 grid (1720 gates), the tree
+contracted in 0.96 s and the sweep took 121 s; at `χ = 16` the whole compute
+took 1.35 s. The trace keeps the same number of rows at any `χ`, so
+`TraceRows` and gas do not change. Quorum compares amplitudes, not traces, so
+nodes with and without the cap still agree.
 
 The AIR does not bind the exact amplitude to the circuit. Quorum agreement on
 the snapped amplitude is what clients can rely on. This is the same kind of
