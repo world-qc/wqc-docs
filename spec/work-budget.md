@@ -2,7 +2,8 @@
 
 - **Status:** Working spec — work budget (first version)
 - **Tier:** B (implementation snapshot)
-- **Verified against:** TBD (filled in after the `feature/work-budget` commits)
+- **Verified:** 2026-11-06
+- **Verified against:** `wqc-core@f145aca` `wqc-node@4be0d4d` `wqc-orchestrator@33d91be` on `feature/work-budget`
 - **Audience:** Implementers of the orchestrator, node, and core
 - **Related:** [`p2p-protocols.md`](p2p-protocols.md) (announcement and bid), [`contraction-tree.md`](contraction-tree.md) (trees and their cost), [`mps-scalar.md`](mps-scalar.md) (the path with no tree)
 

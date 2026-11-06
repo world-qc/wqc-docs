@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-04
-- **Verified against:** `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3). Prior snapshot: `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified:** 2026-11-06
+- **Verified against:** `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4). Prior snapshot: `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
