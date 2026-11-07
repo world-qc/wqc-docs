@@ -3,7 +3,7 @@
 - **Status:** Working spec — work budget (first version)
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-07
-- **Verified against:** `wqc-core@4bf4f0d` on `feature/tn-absorb`; `wqc-node@fc38705` `wqc-orchestrator@84f320c` on main
+- **Verified against:** `wqc-core@41dbd9d` on `feature/compute-cancel`; `wqc-node@fc38705` `wqc-orchestrator@84f320c` on main
 - **Audience:** Implementers of the orchestrator, node, and core
 - **Related:** [`p2p-protocols.md`](p2p-protocols.md) (announcement and bid), [`contraction-tree.md`](contraction-tree.md) (trees and their cost), [`mps-scalar.md`](mps-scalar.md) (the path with no tree)
 
@@ -155,6 +155,11 @@ what is left of `deadline_secs`, whichever is shorter; if nothing is left, it
 reports the failure without calling core. Transfer before acceptance is not
 counted; it is far below the 30 s slack.
 
+When the node stops waiting, it closes its connection to core, and core
+cancels the computation at its next contraction step
+([`openapi/core.yaml`](../openapi/core.yaml) `/compute`). The next sub-task
+does not queue behind one the node has given up on.
+
 A node that bids on work it cannot finish times out and is penalized as today.
 A node that understates its speed only loses work. Neither gains from a false
 estimate, so the orchestrator does not check it.
@@ -229,11 +234,9 @@ and the shallow 5–8-qubit keepalives.
    `max_mps_qubits`, not by time.
 3. **Quote.** The quote does not warn about work no node may take; it cannot
    see bidders.
-4. **Cancelling.** Core keeps computing after the node gives up, so the next
-   sub-task queues behind a lost one. That is a separate change.
-5. **Learning rates.** The node does not refine its rates from its own
+4. **Learning rates.** The node does not refine its rates from its own
    `work_report.compute_wall_ms`; it uses the startup measurement.
-6. **Counting the absorb.** The planner counts a reorder that core skips when
+5. **Counting the absorb.** The planner counts a reorder that core skips when
    it absorbs a small tensor (§5). Counting those joins as core runs them would
    take one byte rate for every join, but changes `traffic_bytes` in the
    orchestrator and in core's benchmark together.
