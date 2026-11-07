@@ -203,7 +203,7 @@ Under a correct Groth16 setup and VK:
 
 ### 5.2 Non-guarantees (thin)
 
-1. **Not** ≡ `verify_root_proof`: host-only Mmcs / FriFold / OOD (and nested group STARKs when
+1. **Not** ≡ `verify_root_proof`: host-only Mmcs / FriFold / OOD / DeepRo (and nested group STARKs when
    present) are not fully re-checked in-circuit.
 2. Thin wrap is a **settlement-aligned commitment wrap**, not a complete on-L2 STARK
    verifier.
