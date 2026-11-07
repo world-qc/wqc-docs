@@ -98,7 +98,7 @@ Computational logic is framed as an execution trace matrix $T \in \mathbb{F}^{T_
 * **Base Field:** Mersenne31 ($\mathbb{F}_p$, where $p = 2^{31} - 1$).
 * **Commitment Scheme:** Circle PCS implemented via Polygon Plonky3.
 * **Serialization:** Postcard serialization format encoding `p3_uni_stark::Proof` structures.
-* **FRI queries:** Circle config `num_queries` is selected from the Orchestrator `security_level` for leaf unitary / Born / trajectory STARKs and for outer AggregationAir / RecAgg proofs (see §5.1). Leaf and aggregation PCS certificates use runtime `n = proof.query_proofs.len()` (capped at 40). Nested Mmcs / FriFold group STARKs default to that same outer `n`; they may use a smaller nested count via `WQC_PCS_NESTED_FRI_QUERIES` (§5.1). Nested DeepRo uni-STARKs still use the fixed 40-query Circle config. Empty / unknown level defaults to $40$ (`DEVNET_FRI_NUM_QUERIES`). This ladder is an **operational cost/throughput control**, not a claim of calibrated soundness bits.
+* **FRI queries:** Circle config `num_queries` is selected from the Orchestrator `security_level` for leaf unitary / Born / trajectory STARKs and for outer AggregationAir / RecAgg proofs (see §5.1). Leaf and aggregation PCS certificates use runtime `n = proof.query_proofs.len()` (capped at 40). Nested Mmcs / FriFold group STARKs default to that same outer `n`; they may use a smaller nested count via `WQC_PCS_NESTED_FRI_QUERIES` (§5.1). Nested DeepRo uni-STARKs on leaf PCS bundles (single-chunk quotients only) use the same nested count; aggregation certificates carry their DeepRo steps host-only, with no nested STARK. Empty / unknown level defaults to $40$ (`DEVNET_FRI_NUM_QUERIES`). This ladder is an **operational cost/throughput control**, not a claim of calibrated soundness bits.
 
 Legacy transcript profile v1 embeds uncompressed floating-point traces evaluated via explicit verifier sumchecks, whereas production profile v2 commits traces via Circle PCS.
 
@@ -193,6 +193,17 @@ Client `security_level` drives quorum (`required_votes`), bid policy, and the FR
 | Shrink tracking `chunk40/nested4q` | 40 | 4 | Smaller nested residual (same historical knobs) |
 
 Measured reference (Poseidon compose, `WQC_PCS_MMCS_GROUP_CHUNK=40`, host-only Mmcs/FriFold/OOD + prior merges): nested=outer ≈ 169 KiB root (`173_483` B). **Pre-wrap size KPI signed off (2026-09-04):** this profile meets the ≤500 KB idle two-leaf gate (see `wqc-contracts` `on-chain_settlement_scope.md` §7). Nested group STARKs are empty on this path (`mmcs_groups=0`, `fri_fold=0`, `ood=0`); siblings + digests remain on the wire. When nested group STARKs are proven, they follow `WQC_PCS_NESTED_FRI_QUERIES` (default = outer). Idle leaves currently ship `deep_ro=0` (multi-chunk quot).
+
+**Aggregation children (host-only DeepRo):** When a child is itself a compose node (a `leaf:unitary_born` / `leaf:unitary_traj` leaf, or an inner node of a multi-level tree), the parent carries an `AggPcsCertificate` for it instead of a leaf bundle. Its DeepRo / DeepRoTrace steps (one pair per proven query) are host-only like Mmcs / FriFold / OOD: `deep_stark` is empty, the verifier recomputes every public value of a step from its inputs, and those inputs are bound to the child's FRI openings and FriFoldY leaves. A step that still carries a STARK (certificates from earlier composers) is verified with it; leaf bundles keep requiring their DeepRo STARKs, so an empty one is not a second valid encoding there. The AIR of these steps constrains public values only, so the nested STARK added no check; it did add one STARK per query, each with as many queries again under the default nested count (`WQC_PCS_NESTED_FRI_QUERIES` unset), so certificate size grew with the square of `n`. Measured 2026-11-07 on a single-leaf Born root (Bell circuit; the leaf is paired with itself, so the root carries it and its certificate twice); `wqc-stark-core` test `single_leaf_born_root_sizes` (ignored; run with `--features plonky3-stark -- --ignored --nocapture`) prints the right-hand column:
+
+| `security_level` | Root with DeepRo STARKs | Root, host-only DeepRo |
+| --- | ---: | ---: |
+| `low` | 264 KB | 143 KB |
+| `normal` | 734 KB | 262 KB |
+| `high` | 2.37 MB | 504 KB |
+| `ultra` | — | 624 KB |
+
+The remaining bytes are mostly the two embedded copies of the leaf (147 KB of the 262 KB at `normal`), which grow linearly with `n`.
 
 **Why nested is not forced to 40 forever:** Outer `n` still dominates *how many* Mmcs paths / FriFold steps PCS materializes. When nested group STARKs are on the wire, each group’s own FRI query count dominates *group_stark* bytes; lowering nested remains a soft size lever. Host-only idle Poseidon compose no longer pays that residual.
 
@@ -338,7 +349,7 @@ The v6 recursive engine operates over an AIR width of 330. It validates left and
 * `1`: `AggPcsCertificate` (child aggregation node).
 * `2`: `LeafPcsBundle` (leaf node: unitary, Born, or trajectory).
 
-Certificates embed Merkle commitments, FriFold evaluations, DeepRo trace bindings (when present), Val/Challenge Mmcs openings (host digest verify by default; optional nested group STARKs), and OOD witnesses (host-native fold by default; optional `OodCheckAir` STARK).
+Certificates embed Merkle commitments, FriFold evaluations, DeepRo trace bindings (on `AggPcsCertificate` host-native with empty nested STARKs; leaf bundles keep their DeepRo STARKs when present), Val/Challenge Mmcs openings (host digest verify by default; optional nested group STARKs), and OOD witnesses (host-native fold by default; optional `OodCheckAir` STARK).
 
 ### 8.3 Leaf PCS Workflow and Delivery Architecture
 
@@ -394,7 +405,7 @@ Default deployment profiles set `WQC_PCS_MMCS_GROUP_CHUNK` to **24** (Mmcs group
 
 To prevent Out-Of-Memory (OOM) failures during leaf/aggregation PCS build, core evaluates peak RAM usage prior to prove when `WQC_MAX_MEMORY_GB` is set. When unset, the memory gate is **disabled** (no refuse/spill enforcement).
 
-**Host-only PCS (production):** nested Mmcs / FriFold / OOD group STARKs are empty; the estimate is dominated by proof decode, sibling buffers, and native digest/fold checks (typically well under a 2 GiB devnet budget at 40q). The historical blowup-16 Keccak group-prove matrix is no longer the dominant term.
+**Host-only PCS (production):** nested Mmcs / FriFold / OOD group STARKs and aggregation-certificate DeepRo STARKs are empty; the estimate is dominated by proof decode, sibling buffers, and native digest/fold checks (typically well under a 2 GiB devnet budget at 40q). The historical blowup-16 Keccak group-prove matrix is no longer the dominant term.
 
 When the gate is active and estimated RAM exceeds the budget, `WQC_PCS_MEMORY_POLICY` governs execution:
 
