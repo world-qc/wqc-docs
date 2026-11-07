@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — scalar tree contract (state tree and network tree)
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-06
-- **Verified against:** `wqc-core@7c98af3` on `feature/tree-trace-bond` (trace sweep bond cap). Prior snapshot: `wqc-orchestrator@6d6dc15` `wqc-core@1fd4b1b` on `feature/bisection-order` (bisection candidate); `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
+- **Verified:** 2026-11-07
+- **Verified against:** `wqc-core@4bf4f0d` on `feature/tn-absorb` (in-place absorb). Prior snapshot: `wqc-core@7c98af3` on `feature/tree-trace-bond` (trace sweep bond cap); `wqc-orchestrator@6d6dc15` `wqc-core@1fd4b1b` on `feature/bisection-order` (bisection candidate); `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
 - **Audience:** Implementers of the scheduler, node, and core; reviewers of quorum, fees, and proof claims
 - **Related:** [`mps-scalar.md`](mps-scalar.md) (the path with no tree), [`economics.md`](economics.md) (fees), [`p2p-protocols.md`](p2p-protocols.md) (signed bytes), [`zk-STARK.md`](zk-STARK.md) (what the proof binds), [`architecture-current.md`](architecture-current.md) (who dispatches)
 
@@ -197,7 +197,10 @@ tensor of a sweep (below).
 `input | output << k`, where `input` and `output` are `k`-bit indices in
 argument order. Before a contraction, each operand is reordered so the shared
 edges come first, in the left operand's order, then its own free legs. The
-result keeps the right operand's free legs, then the left's.
+result keeps the right operand's free legs, then the left's. Core may skip the
+reorder when it absorbs a small operand into a large one in place
+([`work-budget.md`](work-budget.md) §5); the result and the counted peak are
+the same.
 
 **Peak.** A leaf is built when a node takes it. A reordered operand is a copy
 made while the original is still allocated. At each node, the planner counts
