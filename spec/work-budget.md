@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — work budget (first version)
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-06
-- **Verified against:** `wqc-core@f145aca` `wqc-node@4be0d4d` `wqc-orchestrator@33d91be` on `feature/work-budget`
+- **Verified:** 2026-11-07
+- **Verified against:** `wqc-core@4bf4f0d` on `feature/tn-absorb`; `wqc-node@fc38705` `wqc-orchestrator@84f320c` on main
 - **Audience:** Implementers of the orchestrator, node, and core
 - **Related:** [`p2p-protocols.md`](p2p-protocols.md) (announcement and bid), [`contraction-tree.md`](contraction-tree.md) (trees and their cost), [`mps-scalar.md`](mps-scalar.md) (the path with no tree)
 
@@ -165,7 +165,7 @@ Core measures its own rates at startup and reports them in `GET /sysinfo`:
 
 | Field | Measured by |
 |-------|-------------|
-| `tn_seconds_per_byte` | Joining a 2-leg tensor into a 2^23-element tensor whose shared leg is mid-way (so it is reordered), divided by that join's `traffic_bytes` |
+| `tn_seconds_per_byte` | Joining a 2-leg tensor into a 2^23-element tensor whose shared leg is mid-way, divided by that join's `traffic_bytes` |
 | `tn_seconds_per_flop` | Joining two 2^20-element tensors over 10 shared legs, already in order (2^30 flops), divided by its `flops`. Its 48 MiB of traffic stay in the time, which errs slow |
 
 Each join runs three times and the fastest counts. The benchmark runs before
@@ -175,11 +175,32 @@ reports neither rate. The node reads the rates once, after `GET /gates`, and
 sets bit 4 only when both are present and within 10^-13–10^-6 s per byte and
 10^-14–10^-6 s per flop.
 
-On an Apple M-series laptop (release build, `wqc-core` at
-`feature/work-budget`, GEMM on one thread) core measures 17.9 GB/s and
-2.97 Gflop/s. These predict a 7×7 depth-12 bisection at 12.4 s (measured
-12.5 s), a 6×6 depth-16 bisection at 58.6 s (58.7 s), and a 10×10 depth-8
-sweep at 74 s (58–62 s).
+The byte join is the shape a sweep tree is made of: a gate half absorbed into
+a state. `traffic_bytes` counts the state reordered, but core absorbs a tensor
+of at most 6 legs into a larger one in place when the larger one's free bits
+below its lowest shared leg form a run of at least 64 elements, so it never
+moves those bytes. `tn_seconds_per_byte` is therefore seconds per *counted*
+byte of such a join, about 2.4 times lower than for a join that is reordered.
+A join of two large tensors that must be reordered is underestimated by that
+factor. Bisection trees spend almost all their time in flops, so this changes
+their estimate by well under a second; a tree whose time is mostly reordered
+large joins would be underestimated (§8).
+
+On an Apple M-series laptop (release build, `wqc-core` with the in-place
+absorb, GEMM on one thread) core measures 48.9 GB/s and 2.97 Gflop/s.
+Without `overhead`, the estimate against the measured time:
+
+| Tree | `traffic_bytes` | `flops` | Estimate | Measured |
+|------|----------------:|--------:|---------:|---------:|
+| 8×8 depth 11, bisection | 1.66·10^9 | 2.76·10^9 | 0.96 s | 1.35 s |
+| 6×6 depth 14, bisection | 3.28·10^9 | 8.55·10^9 | 2.95 s | 3.23 s |
+| 7×7 depth 12, bisection | 5.63·10^9 | 3.59·10^10 | 12.2 s | 12.6 s |
+| 6×6 depth 16, bisection | 7.34·10^9 | 1.74·10^11 | 58.6 s | 59.2 s |
+| 10×10 depth 8, sweep | 1.10·10^12 | 3.77·10^10 | 35.2 s | 30.0 s |
+
+Trees of a second or two come out at about a quarter to three quarters of their
+time (a 7×7 depth-10 bisection at 0.07 s against 0.25 s); `overhead` covers
+that.
 
 ## 6. Orchestrator
 
@@ -212,6 +233,10 @@ and the shallow 5–8-qubit keepalives.
    sub-task queues behind a lost one. That is a separate change.
 5. **Learning rates.** The node does not refine its rates from its own
    `work_report.compute_wall_ms`; it uses the startup measurement.
+6. **Counting the absorb.** The planner counts a reorder that core skips when
+   it absorbs a small tensor (§5). Counting those joins as core runs them would
+   take one byte rate for every join, but changes `traffic_bytes` in the
+   orchestrator and in core's benchmark together.
 
 ## Appendix: testnet measurements (2026-11-06)
 
