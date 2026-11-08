@@ -350,7 +350,7 @@ Verifiers assert $\mathrm{SHA3\text{-}256}(\mathrm{child\_bytes}) == \mathrm{chi
 | --- | --- | --- | --- |
 | **Direct Walk** | Structural binary traversal of v3 tree. | $\mathcal{O}(N)$ | Evaluates every child leaf natively. |
 | **Digest Attestation** | `AggregationAir` (v4) tail. | $\mathcal{O}(1)$ | Asserts child digest integrity and host flags in-circuit. |
-| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) tail. | $\mathcal{O}(1)$ for leaf children; aggregation children are walked | RecAgg AIR asserts child digests / `pcs_ok`; PCS openings verified at compose/root via host digest + native FriFold/OOD (optional nested group STARKs when present). |
+| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) tail. | $\mathcal{O}(N)$ at the root: children are verified in full (§8.2 below) | RecAgg AIR asserts child digests / `pcs_ok`; PCS openings verified at compose/root via host digest + native FriFold/OOD (optional nested group STARKs when present). |
 
 #### RecursiveAggregationAir (v6 Architecture)
 
@@ -361,7 +361,7 @@ The v6 recursive engine operates over an AIR width of 330. It validates left and
 * `2`: `LeafPcsBundle` (leaf node: unitary, Born, or trajectory).
 * `3`: right side only — same certificate or bundle as the left side, which is not repeated.
 
-**Root fast path and aggregation children:** An `AggPcsCertificate` opens the child's `AggregationAir` proof, which attests the child's digests and nothing it proves. So when `verify_root_proof` takes the RecAgg path, it first checks each embedded child against its header digest and verifies every aggregation child (an inner node, or a `leaf:unitary_born` / `leaf:unitary_traj` leaf) in full, as the audit walk would; leaf children are covered by their `LeafPcsBundle`. Before this check, a root whose inner node embedded bytes that are no proof verified on the fast path. Verifying a Born root at `normal` takes 32 ms for one slice and 254 ms for eight (local, release build).
+**Root fast path and aggregation children:** An `AggPcsCertificate` opens the child's `AggregationAir` proof, which attests the child's digests and nothing it proves. So when `verify_root_proof` takes the RecAgg path, it first checks each embedded child against its header digest and verifies every child in full, as the audit walk would. Aggregation children (an inner node, or a `leaf:unitary_born` / `leaf:unitary_traj` leaf) need it because their certificate attests digests only; leaf children are verified too, because a `LeafPcsBundle` checks PCS openings rather than the whole leaf STARK, and for a multi-chunk quotient it carries no DeepRo steps. Before this check, a root whose inner node embedded bytes that are no proof verified on the fast path. Verifying a Born root at `normal` takes 32 ms for one slice and 254 ms for eight (local, release build).
 
 A composer pairing a lone child with itself (a single-slice task) sends that child once: the v3 `right_len` is `0xFFFFFFFF` and the v6 right side flag is `3`. The verifier reads the left bytes in their place, so every hash and check is the one it would run on the repeated form, which older composers wrote and which still verifies. The encoder uses the back-reference whenever the two sides are byte-equal; a verifier that predates it rejects such a root on the fast path and in the audit walk, so verifiers ship before composers.
 
