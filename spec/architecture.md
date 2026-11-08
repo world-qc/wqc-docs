@@ -205,7 +205,7 @@ sequenceDiagram
    proof-commitment (leaf PCS) bundles are produced by a designated miner, or by open call,
    or by the aggregator as a fallback.
 6. **Aggregation.** An aggregator builds the recursive composition tree (a single leaf is
-   duplicated into a binary tree when needed) and emits the root STARK $\pi_{\text{Root}}$.
+   paired with itself and sent once) and emits the root STARK $\pi_{\text{Root}}$.
 7. **SNARK wrap.** A wrap prover reduces $\pi_{\text{Root}}$ to a succinct $\pi_{\text{snark}}$
    suitable for L2 verification ([`zk-SNARK.md`](zk-SNARK.md)).
 8. **On-chain settlement.** The wrap proof and settle-aligned public inputs are submitted to

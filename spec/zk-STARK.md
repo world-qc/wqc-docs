@@ -194,16 +194,27 @@ Client `security_level` drives quorum (`required_votes`), bid policy, and the FR
 
 Measured reference (Poseidon compose, `WQC_PCS_MMCS_GROUP_CHUNK=40`, host-only Mmcs/FriFold/OOD + prior merges): nested=outer ≈ 169 KiB root (`173_483` B). **Pre-wrap size KPI signed off (2026-09-04):** this profile meets the ≤500 KB idle two-leaf gate (see `wqc-contracts` `on-chain_settlement_scope.md` §7). Nested group STARKs are empty on this path (`mmcs_groups=0`, `fri_fold=0`, `ood=0`); siblings + digests remain on the wire. When nested group STARKs are proven, they follow `WQC_PCS_NESTED_FRI_QUERIES` (default = outer). Idle leaves currently ship `deep_ro=0` (multi-chunk quot).
 
-**Aggregation children (host-only DeepRo):** When a child is itself a compose node (a `leaf:unitary_born` / `leaf:unitary_traj` leaf, or an inner node of a multi-level tree), the parent carries an `AggPcsCertificate` for it instead of a leaf bundle. Its DeepRo / DeepRoTrace steps (one pair per proven query) are host-only like Mmcs / FriFold / OOD: `deep_stark` is empty, the verifier recomputes every public value of a step from its inputs, and those inputs are bound to the child's FRI openings and FriFoldY leaves. A step that still carries a STARK (certificates from earlier composers) is verified with it; leaf bundles keep requiring their DeepRo STARKs, so an empty one is not a second valid encoding there. The AIR of these steps constrains public values only, so the nested STARK added no check; it did add one STARK per query, each with as many queries again under the default nested count (`WQC_PCS_NESTED_FRI_QUERIES` unset), so certificate size grew with the square of `n`. Measured 2026-11-07 on a single-leaf Born root (Bell circuit; the leaf is paired with itself, so the root carries it and its certificate twice); `wqc-stark-core` test `single_leaf_born_root_sizes` (ignored; run with `--features plonky3-stark -- --ignored --nocapture`) prints the right-hand column:
+**Aggregation children (host-only DeepRo):** When a child is itself a compose node (a `leaf:unitary_born` / `leaf:unitary_traj` leaf, or an inner node of a multi-level tree), the parent carries an `AggPcsCertificate` for it instead of a leaf bundle. Its DeepRo / DeepRoTrace steps (one pair per proven query) are host-only like Mmcs / FriFold / OOD: `deep_stark` is empty, the verifier recomputes every public value of a step from its inputs, and those inputs are bound to the child's FRI openings and FriFoldY leaves. A step that still carries a STARK (certificates from earlier composers) is verified with it; leaf bundles keep requiring their DeepRo STARKs, so an empty one is not a second valid encoding there. The AIR of these steps constrains public values only, so the nested STARK added no check; it did add one STARK per query, each with as many queries again under the default nested count (`WQC_PCS_NESTED_FRI_QUERIES` unset), so certificate size grew with the square of `n`. Measured on a single-leaf Born root (Bell circuit; the leaf is paired with itself). The first two columns are from 2026-11-07, when the root still carried the leaf and its certificate twice; the last is after the right side became a back-reference (§8.2). `wqc-stark-core` test `single_leaf_born_root_sizes` (ignored; run with `--features plonky3-stark -- --ignored --nocapture`) prints the right-hand column:
 
-| `security_level` | Root with DeepRo STARKs | Root, host-only DeepRo |
-| --- | ---: | ---: |
-| `low` | 264 KB | 143 KB |
-| `normal` | 734 KB | 262 KB |
-| `high` | 2.37 MB | 504 KB |
-| `ultra` | — | 624 KB |
+| `security_level` | Root with DeepRo STARKs | Root, host-only DeepRo | Leaf sent once |
+| --- | ---: | ---: | ---: |
+| `low` | 264 KB | 143 KB | 79 KB |
+| `normal` | 734 KB | 262 KB | 145 KB |
+| `high` | 2.37 MB | 504 KB | 277 KB |
+| `ultra` | — | 624 KB | 344 KB |
 
-The remaining bytes are mostly the two embedded copies of the leaf (147 KB of the 262 KB at `normal`), which grow linearly with `n`.
+At `normal` the remaining bytes are the embedded leaf (74 KB), its certificate (about 44 KB), and the RecAgg and AggregationAir STARKs (about 26 KB); all grow linearly with `n`.
+
+**Multi-slice roots:** Every compose node embeds its children whole (§8.1), so a root holds every leaf, every inner node's certificate and every node's STARK tails, and grows linearly with the slice count. Measured 2026-11-08 with the composer's pairing (pairs per level, odd tail carried up); `wqc-stark-core` test `multislice_root_sizes` (ignored) prints these:
+
+| Leaves | `security_level` | 2 slices | 3 slices | 4 slices | 8 slices |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Born (Bell) | `low` | 143 KB | 245 KB | 347 KB | 757 KB |
+| Born (Bell) | `normal` | 263 KB | 452 KB | 642 KB | 1.40 MB |
+| Unitary (Bell prefix) | `low` | 33 KB | 85 KB | 128 KB | 319 KB |
+| Unitary (Bell prefix) | `normal` | 60 KB | 156 KB | 236 KB | 589 KB |
+
+An inner node over two Born leaves is 263 KB at `normal`, the same as a two-slice root. Each further Born slice adds about 190 KB at `normal`, most of it the leaf (74 KB), its certificate and the inner nodes' certificates and tails. Born roots stay under 500 KB up to 3 slices at `normal` (452 KB) and at least 4 at `low` (347 KB). Keeping larger trees under that bound needs nodes that do not embed their children.
 
 **Why nested is not forced to 40 forever:** Outer `n` still dominates *how many* Mmcs paths / FriFold steps PCS materializes. When nested group STARKs are on the wire, each group’s own FRI query count dominates *group_stark* bytes; lowering nested remains a soft size lever. Host-only idle Poseidon compose no longer pays that residual.
 
@@ -320,7 +331,7 @@ parent_task_id\0
 <_WQC_COMPOSE_V3_>
 compose_label\0; manifest_root_hash\0;
 left_child_hash:32; right_child_hash:32;
-left_len; left_bytes; right_len; right_bytes;
+left_len; left_bytes; right_len; right_bytes;   (right_len 0xFFFFFFFF: same bytes as left, none follow)
 [AggregationAir tail (v4)]
 [RecursiveAggregationAir tail (v6)]
 
@@ -339,7 +350,7 @@ Verifiers assert $\mathrm{SHA3\text{-}256}(\mathrm{child\_bytes}) == \mathrm{chi
 | --- | --- | --- | --- |
 | **Direct Walk** | Structural binary traversal of v3 tree. | $\mathcal{O}(N)$ | Evaluates every child leaf natively. |
 | **Digest Attestation** | `AggregationAir` (v4) tail. | $\mathcal{O}(1)$ | Asserts child digest integrity and host flags in-circuit. |
-| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) tail. | $\mathcal{O}(1)$ | RecAgg AIR asserts child digests / `pcs_ok`; PCS openings verified at compose/root via host digest + native FriFold/OOD (optional nested group STARKs when present). |
+| **Recursive Aggregation** | `RecursiveAggregationAir` (v6) tail. | $\mathcal{O}(1)$ for leaf children; aggregation children are walked | RecAgg AIR asserts child digests / `pcs_ok`; PCS openings verified at compose/root via host digest + native FriFold/OOD (optional nested group STARKs when present). |
 
 #### RecursiveAggregationAir (v6 Architecture)
 
@@ -348,6 +359,11 @@ The v6 recursive engine operates over an AIR width of 330. It validates left and
 * `0`: Legacy composition (no PCS bundle).
 * `1`: `AggPcsCertificate` (child aggregation node).
 * `2`: `LeafPcsBundle` (leaf node: unitary, Born, or trajectory).
+* `3`: right side only — same certificate or bundle as the left side, which is not repeated.
+
+**Root fast path and aggregation children:** An `AggPcsCertificate` opens the child's `AggregationAir` proof, which attests the child's digests and nothing it proves. So when `verify_root_proof` takes the RecAgg path, it first checks each embedded child against its header digest and verifies every aggregation child (an inner node, or a `leaf:unitary_born` / `leaf:unitary_traj` leaf) in full, as the audit walk would; leaf children are covered by their `LeafPcsBundle`. Before this check, a root whose inner node embedded bytes that are no proof verified on the fast path. Verifying a Born root at `normal` takes 32 ms for one slice and 254 ms for eight (local, release build).
+
+A composer pairing a lone child with itself (a single-slice task) sends that child once: the v3 `right_len` is `0xFFFFFFFF` and the v6 right side flag is `3`. The verifier reads the left bytes in their place, so every hash and check is the one it would run on the repeated form, which older composers wrote and which still verifies. The encoder uses the back-reference whenever the two sides are byte-equal; a verifier that predates it rejects such a root on the fast path and in the audit walk, so verifiers ship before composers.
 
 Certificates embed Merkle commitments, FriFold evaluations, DeepRo trace bindings (on `AggPcsCertificate` host-native with empty nested STARKs; leaf bundles keep their DeepRo STARKs when present), Val/Challenge Mmcs openings (host digest verify by default; optional nested group STARKs), and OOD witnesses (host-native fold by default; optional `OodCheckAir` STARK).
 
@@ -562,7 +578,7 @@ All string fields are NUL-terminated UTF-8 sequence bytes. Multi-byte integers a
 <left_child_hash: 32 bytes>
 <right_child_hash: 32 bytes>
 <left_len: u32 LE><left_child: left_len bytes>
-<right_len: u32 LE><right_child: right_len bytes>
+<right_len: u32 LE><right_child: right_len bytes>   (right_len 0xFFFFFFFF: right child = left child, no bytes follow)
 [optional _WQC_AGG_TAIL_V4_ tail]
 [optional _WQC_REC_TAIL_V6_ tail]
 
