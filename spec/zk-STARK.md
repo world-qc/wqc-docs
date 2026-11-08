@@ -85,6 +85,10 @@ The STARK subsystem guards against malicious worker behaviors, specifically targ
 | `sample_counts` (Mid-Circuit) | Unitary segment traces bounded by measurement gates. | Sequential trajectory event stream + zk marginal/shot proofs. |
 | `expectation` | Algebraic expectation calculation over contracted state. | Result payload digest binding. |
 
+### 2.4 Implementation Status (2026-11)
+
+The deployed leaf STARKs do not yet meet §5–§7. They are proved with empty public inputs, so the §5 context is carried beside the proof rather than committed by it, and the unitary AIR does not yet enforce the §6.3 constraint sets soundly. Until they do, unitary results rest on quorum and trap tasks, Born / marginal / shot-sampling results on the verifier's native recomputation from the published segment, and composition on `verify_root_proof` verifying every child (§8.2). The replacement leaf AIRs are planned on the stack of the recursive verifier (§11).
+
 ---
 
 ## 3. Mathematical Preliminaries
