@@ -47,18 +47,23 @@ carries different indices at different pipeline stages.
 
 ### 1.1 Two `params` dialects
 
-Single-parameter gates (`H`, `X`, `Y`, `Z`, `S`, `T`, `RESET`) have two accepted wire
-forms, and the two ends of the pipeline do **not** accept the same set.
+Single-parameter gates (`H`, `X`, `Y`, `Z`, `S`, `T`, `RESET`) have two wire forms, and
+only the client accepts both. Everything after the orchestrator's intake uses the bare
+form, the **canonical** one.
 
 | Stage | `{"type": "H", "params": 0}` | `{"type": "H", "params": [0]}` |
 |-------|------------------------------|--------------------------------|
 | Client → orchestrator | accepted | accepted |
-| Node → core `/compute` | accepted | **rejected — `400`** |
+| Orchestrator → node (dispatch) | always | never |
+| Node → core `/compute` | accepted | **rejected** (node: validation error; core: `400`) |
 
-The orchestrator normalizes either form while pruning. `wqc-node` then flattens
-one-element arrays to a bare value (`normalize_gate_params`), recursing into
-`IF.params.gate`, immediately before calling core. Core deserializes into a Rust enum
-whose single-parameter variants take a scalar, so an array is a type error there.
+The orchestrator canonicalizes the submitted circuit once, at intake: every one-element
+`params` array becomes its value, recursing into `IF.params.gate`. The gates it builds
+itself (slicing, basis rotations, traps, OpenQASM lowering) are canonical from the start,
+so every dispatched circuit, the dispatch signature and the state-vector leaf's circuit
+(`wqc-sv-stark`'s `wire::parse_circuit`) see one form. Core deserializes into a Rust enum
+whose single-parameter variants take a scalar, so an array is a type error there; the
+node refuses a one-element array before calling core.
 
 **Client guidance:** either form is fine for `POST /api/v1/submit`; the curated examples
 under [`examples/circuits/`](../examples/circuits/) use the array form.
