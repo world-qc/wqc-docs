@@ -365,7 +365,7 @@ compute but has no payout binding.
     "original_qubit_count": 3,
     "slice_id": "01",
     "slice_assignments": [{ "edge_id": "e_0", "value": 1 }],
-    "circuit": [{ "type": "H", "params": [0] }],
+    "circuit": [{ "type": "H", "params": 0 }],
     "required_votes": 2,
     "mps_max_bond_dim": 128,
     "mps_site_order": [],
