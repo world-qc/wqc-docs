@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-11
-- **Verified against:** `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`; the node side is not implemented yet). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified:** 2026-11-12
+- **Verified against:** `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -315,7 +315,7 @@ bids only if it expects to finish in time ([`work-budget.md`](work-budget.md)).
 | `1 << 1` | rotations | `RX`, `RY`, `RZ` | the circuit has a rotation |
 | `1 << 3` | network gate split | `NETWORK_GATE_SPLIT` | the attached network tree takes a gate as halves ([`contraction-tree.md`](contraction-tree.md) §5) |
 | `1 << 4` | work budget | — (set when core `GET /sysinfo` reports `tn_seconds_per_byte` and `tn_seconds_per_flop` within bounds) | the announcement carries `work` ([`work-budget.md`](work-budget.md)) |
-| `1 << 5` | sv-stark v2 leaf | — (set when core proves v2 leaves; the bid then carries `sv_max_rows`) | never in `required_features`; the orchestrator sends a sub-task as a v2 leaf only to nodes with this bit (§6.1) |
+| `1 << 5` | sv-stark v2 leaf | — (set when core `GET /sysinfo` reports `sv_seconds_per_row` and the node's `sv_max_rows` from it is nonzero; the bid then carries `sv_max_rows`) | never in `required_features`; the orchestrator sends a sub-task as a v2 leaf only to nodes with this bit (§6.1) |
 
 Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
 
@@ -364,6 +364,16 @@ the core memory check on `N · χ² · 32` bytes.
 sets it from its own memory and speed, so that the leaf fits and finishes within
 the v2 timeout (§6.1). It is at most 2^22 (`wqc_sv_max_rows`, the protocol limit
 on `W`); a larger value selects nothing more. It is unsigned and omitted when 0.
+The reference node takes the smaller of two bounds, both from core
+`GET /sysinfo`. Core measures `sv_seconds_per_row` at startup by proving a
+small leaf (n = 12, 8 rounding steps, 1024 shots), and reports
+`sv_bytes_per_row` and `sv_base_bytes`:
+
+- Memory: `sv_base_bytes + sv_bytes_per_row · W` fits 80% of the node's RAM
+  budget.
+- Time: `1.5 · sv_seconds_per_row · W` fits both the v2 timeout
+  (`90 s + 50 µs · W`, at most 330 s) and the node's own compute timeout.
+
 A node that overstates it runs out of memory or time and is slashed like any
 other failure. Because the field is unsigned, a node also refuses a dispatch
 whose `sv_leaf_rows` is over its own limit rather than trust the advertised
