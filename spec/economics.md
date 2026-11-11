@@ -29,7 +29,7 @@ The atomic billing unit is one **sub-task** (one slice execution + one leaf STAR
 
 ```
 Gas_quantum = α·VRAM_MiB + β·GateCount + γ·TraceRows
-fri_bps     = fri_queries(security_level) × 10000 / 16
+fri_bps     = tier table (below): low 5000, normal 10000, high 20000, ultra 25000
 TotalFee    = Gas_quantum × BaseFee × 10^9 × fri_bps / 10000
               (pWQC; BaseFee in sWQC / gas; normal tier is fri_bps = 10000)
 R_compute   = TotalFee × 40 / 100             (pWQC, per quorum majority node)
@@ -44,10 +44,9 @@ R_net       = R_compute + R_pcs               (80%, worker budget)
 | `GateCount` | Pruned gate list length | Length of the dispatched circuit |
 | `TraceRows` | STARK execution trace rows | Attested in the work report (fallback: $\max(4, \mathrm{GateCount}+1)$) |
 | `BaseFee` | WQC per gas, stored as sWQC | Locked per parent task at submit; may adjust globally between tasks |
-| `fri_queries` | Outer FRI `num_queries` for the task tier | `low` 8, `normal` 16, `high` 32, `ultra` / empty / unknown 40 ([`zk-STARK.md`](zk-STARK.md) §5.1) |
-| `fri_bps` | TotalFee scale vs `normal` | `queries × 10000 / 16` → 5000 / 10000 / 20000 / 25000 |
+| `fri_bps` | TotalFee scale vs `normal`, per tier | `low` 5000, `normal` 10000, `high` 20000, `ultra` / empty / unknown 25000 |
 
-`fri_bps` prices prove and verify work. Quorum size is a separate multiplier in the escrow bound (§3.1): `normal` and `high` both use `required_votes = 2`, so their price gap is the FRI factor alone (`high` = 2× `normal`). Quote and settlement apply the same `fri_bps` to `TotalFee` before the 40/40/20 split. Integer division is in Planck.
+`fri_bps` prices prove and verify work. It is a table per tier, not a function of a proof system's query count: the fee is quoted before a sub-task is sent as a v1 or a v2 leaf, and the two ladders differ (v1 8 / 16 / 32 / 40 queries, v2 22 / 32 / 37 / 42; [`zk-STARK.md`](zk-STARK.md) §5.1). Quorum size is a separate multiplier in the escrow bound (§3.1): `normal` and `high` both use `required_votes = 2`, so their price gap is the FRI factor alone (`high` = 2× `normal`). Quote and settlement apply the same `fri_bps` to `TotalFee` before the 40/40/20 split. Integer division is in Planck.
 
 VRAM is measured in **MiB**, not KiB, so default coefficients keep per-slice rewards compatible with the 210M supply.
 

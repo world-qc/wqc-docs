@@ -163,7 +163,7 @@ economics receipt is published.
    //   VRAM_MiB = ceil(peak_bytes / 2^20) (contraction-tree.md)
    // otherwise: MPS stand-in width 2048; with a circuit, the cutwidth / time-split walk
    estimated_slices = max(1, 2^(qubits - target_width))   // no-circuit stand-in
-   fri_bps          = fri_queries × 10000 / 16  // low 8, normal 16, high 32, ultra 40
+   fri_bps          = tier table                // low 5000, normal 10000, high 20000, ultra 25000
    TotalFee         = Gas × BaseFee × 10^9 × fri_bps / 10000
    per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)
                       //          compute per node    R_pcs  burn

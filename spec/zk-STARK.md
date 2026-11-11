@@ -168,7 +168,7 @@ $$\mathsf{PI} = \{\,\texttt{circuit\_id},\ \texttt{sub\_task\_id},\ \texttt{node
 
 ### 5.1 SecurityLevel → FRI Query Ladder
 
-Client `security_level` drives quorum (`required_votes`), bid policy, and the FRI fee multiplier on `TotalFee` (`num_queries / 16`, so `normal` = 1× and `high` = 2×; normative formula in [`economics.md`](economics.md) §2). The same tier is copied onto each signed `SubTask` dispatch and threaded orch → node → `wqc-core` for leaf prove/verify, then through compose / RecAgg for the whole task tree (CGO FFI passes the level into leaf and root verifiers).
+Client `security_level` drives quorum (`required_votes`), bid policy, and the fee multiplier on `TotalFee` (a table per tier, `normal` = 1× and `high` = 2×; normative values in [`economics.md`](economics.md) §2). The same tier is copied onto each signed `SubTask` dispatch and threaded orch → node → `wqc-core` for leaf prove/verify, then through compose / RecAgg for the whole task tree (CGO FFI passes the level into leaf and root verifiers).
 
 | `security_level` | FRI `num_queries` |
 | --- | ---: |

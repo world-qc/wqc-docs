@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-06
-- **Verified against:** `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4). Prior snapshot: `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified:** 2026-11-11
+- **Verified against:** `wqc-orchestrator@a577840` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`; the node side is not implemented yet). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -157,7 +157,8 @@ supported_features   uint32 BE
 appending a field would make older bids fail verification. It travels as an unsigned
 JSON field (omitted when 0), the same way `metrics_summary` does. The orchestrator
 uses it only to decide whether a scalar slice fits the node's χ=128 MPS workspace.
-A missing field falls back to `max_qubit_capability`.
+A missing field falls back to `max_qubit_capability`. `sv_max_rows` travels the
+same way: unsigned, omitted when 0 (§5).
 
 **Operator signature on a bid** — a second, independent signature by the operator key,
 binding the economic identity that will be paid:
@@ -200,6 +201,7 @@ security_level       []byte
 mps_time_split       uint32 BE   (omitted when 0)
 contraction_tree_len uint32 BE   (omitted when the task has no tree)
 contraction_tree     []byte      (JSON; omitted together with the length)
+sv_leaf_rows         uint64 BE   (omitted when 0)
 ```
 
 Scalar tasks carry `statevector_scalar` for `output_mode`; `shots`,
@@ -292,6 +294,12 @@ over `/wqc/task-announce/1.0.0`.
 }
 ```
 
+`sv_leaf_rows` asks the node to prove the sub-task as a v2 (sv-stark) leaf and
+gives the leaf's gate rows `W` (§6.1). It is omitted when zero, so a v1
+dispatch stays byte-identical and a node that does not know the field rejects
+only v2 dispatches. A v2 sub-task has no tree and `mps_time_split` zero, so the
+suffix is these 8 bytes alone.
+
 A task with a network tree also carries `deadline_secs`, `work`
 (`traffic_bytes`, `flops`), and `signature_v2` (§3.2), and sets bit 4. A node
 bids only if it expects to finish in time ([`work-budget.md`](work-budget.md)).
@@ -306,6 +314,7 @@ bids only if it expects to finish in time ([`work-budget.md`](work-budget.md)).
 | `1 << 1` | rotations | `RX`, `RY`, `RZ` | the circuit has a rotation |
 | `1 << 3` | network gate split | `NETWORK_GATE_SPLIT` | the attached network tree takes a gate as halves ([`contraction-tree.md`](contraction-tree.md) §5) |
 | `1 << 4` | work budget | — (set when core `GET /sysinfo` reports `tn_seconds_per_byte` and `tn_seconds_per_flop` within bounds) | the announcement carries `work` ([`work-budget.md`](work-budget.md)) |
+| `1 << 5` | sv-stark v2 leaf | — (set when core proves v2 leaves; the bid then carries `sv_max_rows`) | never in `required_features`; the orchestrator sends a sub-task as a v2 leaf only to nodes with this bit (§6.1) |
 
 Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
 
@@ -317,6 +326,7 @@ Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
   "node_id": "12D3KooW...",
   "max_qubit_capability": 34,
   "max_mps_qubits": 2048,
+  "sv_max_rows": 262144,
   "current_load_factors": 0,
   "timestamp": 1717776000,
   "lottery_attempt": 0,
@@ -348,6 +358,11 @@ holds 2048 sites). None of the three is covered by the bid signature.
 `metrics_summary` must not be trusted for consensus or payment. `max_mps_qubits`
 only chooses the scalar slice width; a node that overstates it is still bounded by
 the core memory check on `N · χ² · 32` bytes.
+
+`sv_max_rows` is the largest v2 leaf, in gate rows `W`, the node proves. The node
+sets it from its own memory and speed, so that the leaf fits and finishes within
+the v2 timeout (§6.1). It is unsigned and omitted when 0. A node that overstates
+it runs out of memory or time and is slashed like any other failure.
 
 `operator_id` and `operator_sig` carry the economic identity separately from the node
 identity, so one operator can run many nodes. Without them a bid is still valid for
@@ -386,9 +401,38 @@ compute but has no payout binding.
 Circuit indices on a branched slice are **local to the compact register**, already pruned and remapped
 from the client's global indices. An exact-tree dispatch keeps parent wire numbers and
 carries `contraction_tree` ([`contraction-tree.md`](contraction-tree.md)). Gate grammar is in
-[`circuit-payload.md`](circuit-payload.md) — note in particular that the dispatch wire
-uses the array form for single-parameter gates, while `wqc-core` requires the bare form,
-so a node must normalize before calling `/compute`.
+[`circuit-payload.md`](circuit-payload.md). Single-operand gates are always the bare form
+on the dispatch wire (§1.1 there), the form `wqc-core` reads, so a node passes the circuit
+through unchanged.
+
+### 6.1 v2 leaves
+
+A v2 (sv-stark) leaf proves that the dispatched circuit, applied to `|0…0⟩`, ends
+in a state with the reported digest, and that the reported counts are the leaf's
+sampling of that state with `sample_seed`. The proof binds `circuit_id`,
+`sub_task_id`, `node_id`, and `slice_id` too.
+
+The orchestrator sends a sub-task as a v2 leaf when all of these hold:
+
+- The task is `sample_counts`, unsliced (no assignments), without noise, with at
+  most 2^16 shots and 1 to 16 classical bits.
+- The circuit has a v2 leaf: only unitary gates followed by terminal `MEASURE`s,
+  with `W` (gate rows: rounding steps × 2^(n−1), from `libwqc_stark_verifier`'s
+  `wqc_sv_leaf_rows`) at most 2^22.
+- Every node of the quorum group has bit 5 and `sv_max_rows ≥ W`. The
+  orchestrator first looks for such a group, then takes any group and sends v1.
+- The orchestrator can build the leaf's verifier now: its estimated peak
+  (`wqc_sv_verifier_peak_bytes`) fits the memory it can spare.
+
+Otherwise the sub-task goes out as a v1 leaf. Traps stay v1. A recovery dispatch
+of a v2 sub-task goes only to a node with bit 5 and `sv_max_rows ≥ W`.
+
+The timeout of a v2 leaf is `90 s + 50 µs × W`, with no tier multiplier, capped
+like every sub-task (330 s by default).
+
+v2 dispatch is behind the orchestrator's `WQC_SV_STARK_V2_DISPATCH` (off by
+default) until the composer aggregates v2 leaves. The orchestrator verifies v2
+results whenever they arrive.
 
 ## 7. Result
 
@@ -425,6 +469,14 @@ so a node must normalize before calling `/compute`.
 
 `complex_result` is present in every mode. `sample_result` and `expectation_result`
 appear only in their own mode.
+
+A v2 leaf result (§6.1) is `sample_counts`. Its `public_inputs` add `sv_digest`, the
+terminal-state digest as four Goldilocks words (`[u64; 4]`, JSON numbers), and
+`stark_proof_b64` holds the v2 proof (postcard bytes). The orchestrator checks the
+proof against the dispatch, `sv_digest`, `sample_seed`, and the canonical counts
+JSON, `{"counts":{…},"shots":N}` with keys of exactly `classical_bit_count` bits in
+order and no zero counts. It does not run the v1 unitary verifier or the
+distribution binding for it. The quorum compares the counts as for v1.
 
 `work_report` feeds gas settlement. Only `trace_rows` and `gate_count` are deterministic
 and therefore settlement-relevant; the wall-clock fields are audit-only. Nodes also send
