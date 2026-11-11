@@ -170,12 +170,14 @@ $$\mathsf{PI} = \{\,\texttt{circuit\_id},\ \texttt{sub\_task\_id},\ \texttt{node
 
 Client `security_level` drives quorum (`required_votes`), bid policy, and the fee multiplier on `TotalFee` (a table per tier, `normal` = 1× and `high` = 2×; normative values in [`economics.md`](economics.md) §2). The same tier is copied onto each signed `SubTask` dispatch and threaded orch → node → `wqc-core` for leaf prove/verify, then through compose / RecAgg for the whole task tree (CGO FFI passes the level into leaf and root verifiers).
 
-| `security_level` | FRI `num_queries` |
-| --- | ---: |
-| `low` | 8 |
-| `normal` | 16 |
-| `high` | 32 |
-| `ultra` (or empty / unknown) | 40 |
+| `security_level` | v1 leaf FRI `num_queries` | sv-stark (v2) leaf FRI `num_queries` |
+| --- | ---: | ---: |
+| `low` | 8 | 22 |
+| `normal` | 16 | 32 |
+| `high` | 32 | 37 |
+| `ultra` (or empty / unknown) | 40 | 42 |
+
+The sv-stark leaf ([`p2p-protocols.md`](p2p-protocols.md) §6.1, `wqc-sv-stark` on Goldilocks²) uses blowup 4 and a 16-bit query PoW at every tier; only the query count changes (`FriParams::leaf`). Its "v2" is the leaf generation, not the `_M31_PLONKY3_STARK_V2_` proof format (§10, Appendix A). The fee does not follow either column ([`economics.md`](economics.md) §2).
 
 **Binding and authority:**
 

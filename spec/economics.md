@@ -46,7 +46,7 @@ R_net       = R_compute + R_pcs               (80%, worker budget)
 | `BaseFee` | WQC per gas, stored as sWQC | Locked per parent task at submit; may adjust globally between tasks |
 | `fri_bps` | TotalFee scale vs `normal`, per tier | `low` 5000, `normal` 10000, `high` 20000, `ultra` / empty / unknown 25000 |
 
-`fri_bps` prices prove and verify work. It is a table per tier, not a function of a proof system's query count: the fee is quoted before a sub-task is sent as a v1 or a v2 leaf, and the two ladders differ (v1 8 / 16 / 32 / 40 queries, v2 22 / 32 / 37 / 42; [`zk-STARK.md`](zk-STARK.md) §5.1). Quorum size is a separate multiplier in the escrow bound (§3.1): `normal` and `high` both use `required_votes = 2`, so their price gap is the FRI factor alone (`high` = 2× `normal`). Quote and settlement apply the same `fri_bps` to `TotalFee` before the 40/40/20 split. Integer division is in Planck.
+`fri_bps` prices prove and verify work. It is a table per tier, not a function of a proof system's query count: the fee is quoted before a sub-task is sent as a v1 or a v2 leaf, and the two ladders differ (v1 8 / 16 / 32 / 40 queries, sv-stark v2 22 / 32 / 37 / 42; [`zk-STARK.md`](zk-STARK.md) §5.1). Quorum size is a separate multiplier in the escrow bound (§3.1): `normal` and `high` both use `required_votes = 2`, so their price gap is the FRI factor alone (`high` = 2× `normal`). Quote and settlement apply the same `fri_bps` to `TotalFee` before the 40/40/20 split. Integer division is in Planck.
 
 VRAM is measured in **MiB**, not KiB, so default coefficients keep per-slice rewards compatible with the 210M supply.
 

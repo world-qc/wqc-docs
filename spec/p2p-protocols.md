@@ -3,7 +3,7 @@
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-11
-- **Verified against:** `wqc-orchestrator@a577840` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`; the node side is not implemented yet). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified against:** `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`; the node side is not implemented yet). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -157,8 +157,9 @@ supported_features   uint32 BE
 appending a field would make older bids fail verification. It travels as an unsigned
 JSON field (omitted when 0), the same way `metrics_summary` does. The orchestrator
 uses it only to decide whether a scalar slice fits the node's χ=128 MPS workspace.
-A missing field falls back to `max_qubit_capability`. `sv_max_rows` travels the
-same way: unsigned, omitted when 0 (§5).
+A missing field falls back to `max_qubit_capability`. `sv_max_rows` is not in this
+layout either: like `max_mps_qubits`, it is an unsigned JSON field omitted when 0,
+and a missing field means the node proves no v2 leaf (§5).
 
 **Operator signature on a bid** — a second, independent signature by the operator key,
 binding the economic identity that will be paid:
@@ -361,8 +362,12 @@ the core memory check on `N · χ² · 32` bytes.
 
 `sv_max_rows` is the largest v2 leaf, in gate rows `W`, the node proves. The node
 sets it from its own memory and speed, so that the leaf fits and finishes within
-the v2 timeout (§6.1). It is unsigned and omitted when 0. A node that overstates
-it runs out of memory or time and is slashed like any other failure.
+the v2 timeout (§6.1). It is at most 2^22 (`wqc_sv_max_rows`, the protocol limit
+on `W`); a larger value selects nothing more. It is unsigned and omitted when 0.
+A node that overstates it runs out of memory or time and is slashed like any
+other failure. Because the field is unsigned, a node also refuses a dispatch
+whose `sv_leaf_rows` is over its own limit rather than trust the advertised
+value.
 
 `operator_id` and `operator_sig` carry the economic identity separately from the node
 identity, so one operator can run many nodes. Without them a bid is still valid for
@@ -414,8 +419,8 @@ sampling of that state with `sample_seed`. The proof binds `circuit_id`,
 
 The orchestrator sends a sub-task as a v2 leaf when all of these hold:
 
-- The task is `sample_counts`, unsliced (no assignments), without noise, with at
-  most 2^16 shots and 1 to 16 classical bits.
+- The task is `sample_counts`, unsliced (no assignments), without noise, with 1
+  to 2^16 shots and 1 to 16 classical bits.
 - The circuit has a v2 leaf: only unitary gates followed by terminal `MEASURE`s,
   with `W` (gate rows: rounding steps × 2^(n−1), from `libwqc_stark_verifier`'s
   `wqc_sv_leaf_rows`) at most 2^22.
@@ -423,6 +428,13 @@ The orchestrator sends a sub-task as a v2 leaf when all of these hold:
   orchestrator first looks for such a group, then takes any group and sends v1.
 - The orchestrator can build the leaf's verifier now: its estimated peak
   (`wqc_sv_verifier_peak_bytes`) fits the memory it can spare.
+
+The orchestrator builds the verifier before it dispatches, one build at a time,
+and caches it per circuit, shots, classical bits, and tier. A build blocks that
+dispatch (up to about 16 s at `W` = 2^22). If the verifier is gone when a result
+arrives (evicted, or the orchestrator restarted), it is built again; if that
+build fails for lack of memory, the result is rejected and the sub-task is
+redispatched without a slash.
 
 Otherwise the sub-task goes out as a v1 leaf. Traps stay v1. A recovery dispatch
 of a v2 sub-task goes only to a node with bit 5 and `sv_max_rows ≥ W`.
