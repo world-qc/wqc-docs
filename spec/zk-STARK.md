@@ -81,13 +81,16 @@ The STARK subsystem guards against malicious worker behaviors, specifically targ
 | Output Mode | Primary Leaf Claim | Auxiliary Binding Obligation |
 | --- | --- | --- |
 | `statevector_scalar` | Unitary contraction of a target amplitude scalar. | None. An exact contraction tree adds no segment; the amplitude stays outside the AIR ([`contraction-tree.md`](contraction-tree.md) §7). |
-| `sample_counts` (Terminal) | Unitary state evolution of the measured sub-circuit. | Born rule distribution commitment + deterministic PRNG sampling. |
+| `sample_counts` (Terminal, every qubit measured) | State-vector leaf (sv-stark, §6.4): the final state's digest and the counts of the dispatched seed's shots, in one proof. | None; the counts are in the statement. |
+| `sample_counts` (Terminal, partly measured) | Unitary state evolution of the measured sub-circuit, per slice. | Born rule distribution commitment + deterministic PRNG sampling. |
 | `sample_counts` (Mid-Circuit) | Unitary segment traces bounded by measurement gates. | Sequential trajectory event stream + zk marginal/shot proofs. |
 | `expectation` | Algebraic expectation calculation over contracted state. | Result payload digest binding. |
 
 ### 2.4 Implementation Status (2026-11)
 
-The deployed leaf STARKs do not yet meet §5–§7. They are proved with empty public inputs, so the §5 context is carried beside the proof rather than committed by it, and the unitary AIR does not yet enforce the §6.3 constraint sets soundly. Until they do, unitary results rest on quorum and trap tasks, Born / marginal / shot-sampling results on the verifier's native recomputation from the published segment, and composition on `verify_root_proof` verifying every child (§8.2). The replacement leaf AIRs are planned on the stack of the recursive verifier (§11).
+A terminal `sample_counts` task with every qubit measured is proved by the state-vector leaf (§6.4) and its root (§8.5): the statement commits the dispatch context, the final state's digest, the seed and the counts, and the orchestrator verifies the proof against the statement it builds from the dispatch it signed, the digest and counts the node reported, and the seed it dispatched. That is the first path on which the proof, not the quorum, carries the result.
+
+The other leaf STARKs (§6.1–§6.3, §7) do not yet meet §5–§7. They are proved with empty public inputs, so the §5 context is carried beside the proof rather than committed by it, and the unitary AIR does not yet enforce the §6.3 constraint sets soundly. Until they do, unitary results rest on quorum and trap tasks, Born / marginal / shot-sampling results on the verifier's native recomputation from the published segment, and composition on `verify_root_proof` verifying every child (§8.2). Their replacement is the state-vector leaf extended to mid-circuit measurement, on the same recursive stack (§11).
 
 ---
 
@@ -288,6 +291,17 @@ $$\vert{}0\rangle \mapsto \frac{\vert{}0\rangle + \vert{}1\rangle}{\sqrt{2}}, \q
 4. **Control and Rotation Payload:** Validates $\texttt{ctrl\_active}$ / $\texttt{ctrl\_active\_2}$ discretization and rotation parameters ($\texttt{p\_cos}$, $\texttt{p\_sin}$) for controlled and parameterized gates.
 5. **Boundary Identity:** Verifies that terminal row amplitudes match committed boundary values within $2^{30}$ fixed-point precision ($\texttt{FIXED\_POINT\_SCALE} = 10{,}000$).
 
+### 6.4 State-Vector Leaf (sv-stark, v2)
+
+The state-vector leaf proves a whole sub-task at once: applying the dispatched circuit to $\vert 0\ldots0\rangle$ yields a final state with a given digest, and, for `sample_counts`, the reported counts are that state's sampling under the dispatched seed. It is a Plonky3 STARK over Goldilocks² (not the Mersenne31 Circle PCS of §3.2 and §6.1–§6.3), with blowup 4, a 16-bit query proof of work, and the query count of §5.1's v2 column. The normative description of its arithmetic, gate fusion, digest, sampler and statement is `wqc-sv-stark`'s README in `wqc-stark-engine`; this section fixes what the protocol relies on.
+
+* **Circuit as verifier.** The fused gate list and qubit count are preprocessed columns, so a proof verifies only against the verifier of the circuit it was built for. The orchestrator builds that verifier from the circuit it signed (`wqc_sv_leaf_new`, cached per circuit, shots, classical bits and tier) and never from anything the prover sends. The tier is part of the verifier too.
+* **Statement.** `[context(4), digest(4), seed_lo, seed_hi, shots, counts_digest(4)]`, fifteen Goldilocks elements. `context` is SHA3-256 of `WQC_SV_CTX_V1` and the length-prefixed `circuit_id`, `sub_task_id`, `node_id`, `slice_id` of the dispatch, as four words reduced modulo the prime; `digest` is a Poseidon2 sponge over the final amplitudes; `counts_digest` is a Poseidon2 sponge over the counts vector indexed by register value. The verifier computes the expected statement from the dispatch it signed, the digest the node reported in its public inputs (for the root, the digest of the accepted result), the dispatched seed and the reported counts (which must be canonical: `counts_len` entries, each at most `shots`, summing to `shots`), and verifies the proof against it. The prover's own statement is never used.
+* **Arithmetic.** Amplitudes are integers in units of $2^{-28}$; every gate output is rounded to nearest, ties up, and the rounding is proved by a range-checked identity. Execution is integer-only and bit-exact on any hardware; gate matrices are rounded once at build, after fusion, with rotation `sin`/`cos` from a pinned pure-Rust `libm`. The counts derive from that integer state, so honest nodes report the same counts and the same digest bit for bit; the quorum compares the counts.
+* **Sampling.** Draws are words of a Poseidon2 permutation of the seed and a counter, rejected when at or above the total weight, so each shot picks basis state $b$ with probability $p_b / T$ exactly. This is not v1's `StdRng` sampler: the same seed gives different counts, from the same distribution.
+* **Size.** $1 \le n \le 16$ qubits, $W \le 2^{22}$ gate rows ($W$ = rounding steps $\times\ 2^{n-1}$; monomial gates such as X, Z, CNOT, CZ add no rows), $1 \le$ `shots` $\le 2^{16}$, $1 \le$ `cbits` $\le 16$. A node advertises the $W$ it proves (`sv_max_rows`); the orchestrator dispatches a leaf only to nodes that cover it ([`p2p-protocols.md`](p2p-protocols.md) §6.1).
+* **Gate fusion.** Runs of single-qubit gates on a qubit are multiplied in `f64` by one fixed rule and rounded once, and monomial gates are folded into a permutation-and-phase frame. The rule is part of the leaf format: changing it changes digests, so a new rule needs a new capability bit.
+
 ---
 
 ## 7. Distribution and Trajectory Subsystems
@@ -442,6 +456,14 @@ When the gate is active and estimated RAM exceeds the budget, `WQC_PCS_MEMORY_PO
 
 * **`refuse` (Default):** Terminates bundle generation with a stable error (`PCS memory: ... (policy=refuse)`), returning HTTP 422 from core. The node maps this to P2P `refused: true`; the orchestrator tries the next quorum majority node or, when exhausted, compose fallback.
 * **`spill`:** Decrements the active Mmcs group chunk size (via session override of `WQC_PCS_MMCS_GROUP_CHUNK`) toward 1 until estimated memory falls within budget. If memory still exceeds budget at chunk size 1, the engine defaults to `refuse`.
+
+### 8.5 State-Vector Root (v2)
+
+A task whose leaves are state-vector leaves (§6.4) has a v2 root instead of the v3 / v6 tree above. The composer puts one recursion layer over each leaf proof, then aggregates the layers two at a time (an odd one is carried up) until one proof remains; a single leaf's root is its layer. The root's statement is the concatenation of the leaves' statements in leaf order, so it names every dispatch context, digest, seed and counts digest the leaves proved. The root bytes (`application/wqc-sv-root-v2`) are every recursion proof of the tree, layers first, root last.
+
+The verifier rebuilds the tree from the leaves' circuits: for each leaf it derives the layer's verifier from the leaf's verifier (§6.4, never from the prover), checks the carried intermediate proof against the statement it expects, and uses the verified layer as the child of the next aggregation, up to the root. The orchestrator builds the expected statements from the results it accepted (the winning dispatch inputs and the final counts of each slice), so a leaf proof that does not carry them yields a root it rejects (`wqc_sv_verify_root`). The orchestrator also compares the estimated peak of that verification (`wqc_sv_root_peak_bytes`, about 320 MB for one leaf) with the memory it can spare before it dispatches the task.
+
+A v2 task today has one leaf ([`p2p-protocols.md`](p2p-protocols.md) §6.1), so its root is one layer (about 195 KB at `low`), verified in about 4 s. The root is the task's proof root for the manifest and settlement like a v3 / v6 root (`wrap_root_hash` is the Keccak of its bytes), with one difference: it binds nothing beyond the leaf statements, so the manifest is matched against them by the verifier, outside the proof, where a v3 / v6 root carries `manifest_root_hash` in its statement. It has no SNARK wrap yet, so validity-proof settlement keeps tasks on v1 until [`zk-SNARK.md`](zk-SNARK.md) covers it.
 
 ---
 
