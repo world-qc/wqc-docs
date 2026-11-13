@@ -3,7 +3,7 @@
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-13
-- **Verified against:** `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf). Prior snapshot: `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified against:** `wqc-orchestrator@7c477a7` `wqc-node@ed2449e` `wqc-core@8fb5b78` `wqc-stark-engine@697aead` on `feature/sv-stark-dynamic` (bit 6, core `sv_dynamic`, mid-circuit circuits rewritten by `wire::parse_leaf`). Prior snapshot: `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf); `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -316,6 +316,7 @@ bids only if it expects to finish in time ([`work-budget.md`](work-budget.md)).
 | `1 << 3` | network gate split | `NETWORK_GATE_SPLIT` | the attached network tree takes a gate as halves ([`contraction-tree.md`](contraction-tree.md) §5) |
 | `1 << 4` | work budget | — (set when core `GET /sysinfo` reports `tn_seconds_per_byte` and `tn_seconds_per_flop` within bounds) | the announcement carries `work` ([`work-budget.md`](work-budget.md)) |
 | `1 << 5` | sv-stark v2 leaf | — (set when core `GET /sysinfo` reports `sv_seconds_per_row` and the node's `sv_max_rows` from it is nonzero; the bid then carries `sv_max_rows`) | the task's unsliced sub-task is a v2 leaf (§6.1): every bidder must prove v2 leaves, and the sub-task goes only to nodes whose `sv_max_rows` covers it |
+| `1 << 6` | sv-stark v2 mid-circuit leaf | — (set with bit 5 when core `GET /sysinfo` also reports `sv_dynamic: true`) | the v2 task's circuit has mid-circuit semantics (§6.1): every bidder must prove its rewritten leaf |
 
 Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
 
@@ -367,7 +368,8 @@ on `W`); a larger value selects nothing more. It is unsigned and omitted when 0.
 The reference node takes the smaller of two bounds, both from core
 `GET /sysinfo`. Core measures `sv_seconds_per_row` at startup by proving a
 small leaf (n = 12, 8 rounding steps, 1024 shots), and reports
-`sv_bytes_per_row` and `sv_base_bytes`:
+`sv_bytes_per_row` and `sv_base_bytes`, and `sv_dynamic: true` when it also proves
+mid-circuit circuits (bit 6):
 
 - Memory: `sv_base_bytes + sv_bytes_per_row · W` fits 80% of the node's RAM
   budget.
@@ -433,13 +435,18 @@ A task is a **v2 task** when all of these hold at submission:
   bits and at least one `MEASURE`. Qubits that are not measured, or that no gate
   touches, are allowed: the leaf samples the whole state and counts only the
   measured bits.
-- The circuit has a v2 leaf: only unitary gates followed by terminal `MEASURE`s,
-  with at least one rounding step (a circuit of X, Z, CNOT, CZ and the like
-  alone has none) and `W` (gate rows: rounding steps × 2^(n−1), from
-  `libwqc_stark_verifier`'s `wqc_sv_leaf_rows`) at most 2^22.
+- The circuit has a v2 leaf, with at least one rounding step (a circuit of X, Z,
+  CNOT, CZ and the like alone has none) and `W` (gate rows: rounding steps ×
+  2^(n−1), from `libwqc_stark_verifier`'s `wqc_sv_leaf_rows`) at most 2^22. A
+  circuit with mid-circuit semantics ([`circuit-payload.md`](circuit-payload.md)
+  §2.1) has one when its rewritten form does ([`zk-STARK.md`](zk-STARK.md) §6.5):
+  every IF holds a one-qubit gate, CNOT or CZ (not CCNOT), and the register plus
+  one ancilla per RESET of a used qubit is at most 16 qubits; `n` in `W` counts
+  the ancillas.
 
 A v2 task is proved as a v2 leaf and nothing else. Its announcement sets bit 5
-in `required_features`, so only nodes that prove v2 leaves bid. The
+in `required_features`, and bit 6 too when its circuit has mid-circuit
+semantics, so only nodes that prove such leaves bid. The
 announcement does not carry `W`; at dispatch the orchestrator takes a quorum
 group from the bidders with `sv_max_rows ≥ W` and waits for idle ones when
 there are too few. When no bidder at all, busy or idle, has `sv_max_rows ≥ W`,

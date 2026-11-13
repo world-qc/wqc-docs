@@ -101,6 +101,11 @@ The distinction is not cosmetic — it selects the execution and proving strateg
 | Proof tail | Born distribution segment | Trajectory segment |
 | Qubit limit | bounded in practice by statevector width | **hard limit of 20** |
 
+Either kind of `sample_counts` circuit is proved instead by a state-vector (v2) leaf when it has
+one ([`p2p-protocols.md`](p2p-protocols.md) §6.1): a mid-circuit circuit is then rewritten into
+unitary gates and terminal measurements ([`zk-STARK.md`](zk-STARK.md) §6.5), and its counts come
+from the leaf's sampler, not the per-shot simulation, from the same distribution.
+
 ## 3. Output modes
 
 `output_mode` selects what the task returns and what the STARK binds.
