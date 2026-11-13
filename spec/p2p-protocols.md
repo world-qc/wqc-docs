@@ -3,7 +3,7 @@
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-13
-- **Verified against:** `wqc-orchestrator@3f392b3` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback). Prior snapshot: `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified against:** `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback). Prior snapshot: `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -430,8 +430,8 @@ sampling of that state with `sample_seed`. The proof binds `circuit_id`,
 A task is a **v2 task** when all of these hold at submission:
 
 - It is `sample_counts` without noise, with 1 to 2^16 shots and 1 to 16
-  classical bits, and every qubit is measured, so its sub-task is unsliced (a
-  task with an unmeasured qubit is sliced on it and stays v1).
+  classical bits, and every qubit is measured (a task with an unmeasured qubit
+  is sliced on it, and a slice is a v1 leaf).
 - The circuit has a v2 leaf: only unitary gates followed by terminal `MEASURE`s,
   with at least one rounding step (a circuit of X, Z, CNOT, CZ and the like
   alone has none) and `W` (gate rows: rounding steps × 2^(n−1), from
@@ -443,15 +443,20 @@ announcement does not carry `W`; at dispatch the orchestrator takes a quorum
 group from the bidders with `sv_max_rows ≥ W` and waits for idle ones when
 there are too few. When no bidder at all, busy or idle, has `sv_max_rows ≥ W`,
 waiting cannot help: the task fails with that reason and its escrow is refunded.
+The same happens when the pool's smallest `max_qubit_capability` is below the
+task's register: the task would have to be sliced, and a fully measured task has
+no qubit to slice on.
 
 The orchestrator builds the leaf's verifier before it dispatches, one build at a
 time, and caches it per circuit, shots, classical bits, and tier. A build blocks
-that dispatch (up to about 16 s at `W` = 2^22). When the build does not fit the
-memory the orchestrator can spare (`wqc_sv_verifier_peak_bytes`), the sub-task
-stays queued and is tried again when a node next becomes idle. If the verifier
-is gone when a result arrives (evicted, or the orchestrator restarted), it is
-built again; if that build fails for lack of memory, the result is rejected and
-the sub-task is redispatched without a slash.
+that dispatch (up to about 16 s at `W` = 2^22). Before it builds, it checks that
+verifying the task's root (`wqc_sv_root_peak_bytes`, [`zk-STARK.md`](zk-STARK.md)
+§8.5) and building the verifier (`wqc_sv_verifier_peak_bytes`) fit the memory
+it can spare; when they do not, the sub-task stays queued and is tried again
+after 15 s, until the task's 30-minute dispatch window ends and it fails. If the
+verifier is gone when a result arrives (evicted, or the orchestrator restarted),
+it is built again; if that build fails for lack of memory, the result is
+rejected and the sub-task is redispatched without a slash.
 
 Every other task goes out as v1 leaves. Traps stay v1 on every task. A recovery
 dispatch of a v2 sub-task goes only to a node with bit 5 and `sv_max_rows ≥ W`.
