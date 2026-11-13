@@ -93,18 +93,26 @@ Reference payloads live in [`examples/circuits/sample/`](../examples/circuits/sa
 A circuit uses **mid-circuit semantics** when it contains `RESET`, `IF`, or any unitary
 gate after the first `MEASURE`. Otherwise its measurements are **terminal**.
 
+**Measured qubits are frozen.** After a `MEASURE` of qubit `q`, no gate may act on `q`, as
+target or control and including the gate inside an `IF`, until a `RESET` of `q`. A circuit
+that does is invalid: the orchestrator rejects a plain gate on a measured qubit at
+submission, and wqc-core (and the state-vector leaf's reader) reject the circuit when it is
+executed. `MEASURE` of an already measured qubit is allowed and reads the same value.
+
 The distinction is not cosmetic — it selects the execution and proving strategy:
 
 | | Terminal | Mid-circuit |
 |--|----------|-------------|
-| Sampling | Born probabilities from the contracted statevector | Per-shot trajectory simulation |
-| Proof tail | Born distribution segment | Trajectory segment |
-| Qubit limit | bounded in practice by statevector width | **hard limit of 20** |
+| Sampling, v1 | Born probabilities from the contracted statevector | Per-shot trajectory simulation |
+| Proof tail, v1 | Born distribution segment | Trajectory segment |
+| v2 (when the circuit has a state-vector leaf) | State-vector leaf over the circuit | State-vector leaf over the circuit rewritten with measurements deferred (capability bit 6) |
+| Qubit limit | bounded in practice by statevector width (v2: 16) | **hard limit of 20** (v2: 16 with ancillas) |
 
-Either kind of `sample_counts` circuit is proved instead by a state-vector (v2) leaf when it has
-one ([`p2p-protocols.md`](p2p-protocols.md) §6.1): a mid-circuit circuit is then rewritten into
+Either kind of `sample_counts` circuit is proved by a state-vector (v2) leaf when it has one
+([`p2p-protocols.md`](p2p-protocols.md) §6.1): a mid-circuit circuit is then rewritten into
 unitary gates and terminal measurements ([`zk-STARK.md`](zk-STARK.md) §6.5), and its counts come
-from the leaf's sampler, not the per-shot simulation, from the same distribution.
+from the leaf's sampler, not the per-shot simulation, from the same distribution. The v1 rows
+apply otherwise.
 
 ## 3. Output modes
 
