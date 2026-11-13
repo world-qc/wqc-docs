@@ -81,14 +81,13 @@ The STARK subsystem guards against malicious worker behaviors, specifically targ
 | Output Mode | Primary Leaf Claim | Auxiliary Binding Obligation |
 | --- | --- | --- |
 | `statevector_scalar` | Unitary contraction of a target amplitude scalar. | None. An exact contraction tree adds no segment; the amplitude stays outside the AIR ([`contraction-tree.md`](contraction-tree.md) §7). |
-| `sample_counts` (Terminal, every qubit measured) | State-vector leaf (sv-stark, §6.4): the final state's digest and the counts of the dispatched seed's shots, in one proof. | None; the counts are in the statement. |
-| `sample_counts` (Terminal, partly measured) | Unitary state evolution of the measured sub-circuit, per slice. | Born rule distribution commitment + deterministic PRNG sampling. |
+| `sample_counts` (Terminal) | State-vector leaf (sv-stark, §6.4): the final state's digest and the counts of the dispatched seed's shots, in one proof. Unmeasured qubits are marginalized by the sampler. | None; the counts are in the statement. |
 | `sample_counts` (Mid-Circuit) | Unitary segment traces bounded by measurement gates. | Sequential trajectory event stream + zk marginal/shot proofs. |
 | `expectation` | Algebraic expectation calculation over contracted state. | Result payload digest binding. |
 
 ### 2.4 Implementation Status (2026-11)
 
-A terminal `sample_counts` task with every qubit measured is proved by the state-vector leaf (§6.4) and its root (§8.5): the statement commits the dispatch context, the final state's digest, the seed and the counts, and the orchestrator verifies the proof against the statement it builds from the dispatch it signed, the digest and counts the node reported, and the seed it dispatched. That is the first path on which the proof, not the quorum, carries the result.
+A terminal `sample_counts` task (only unitary gates before its `MEASURE`s, whether or not every qubit is measured) is proved by the state-vector leaf (§6.4) and its root (§8.5): the statement commits the dispatch context, the final state's digest, the seed and the counts, and the orchestrator verifies the proof against the statement it builds from the dispatch it signed, the digest and counts the node reported, and the seed it dispatched. That is the first path on which the proof, not the quorum, carries the result. A terminal task whose circuit needs no rounding step (X, Z, CNOT, CZ and the like only) has no state-vector leaf and stays on the v1 Born path of §7, as does every task when the orchestrator runs with v2 off or under validity-proof settlement ([`p2p-protocols.md`](p2p-protocols.md) §6.1).
 
 The other leaf STARKs (§6.1–§6.3, §7) do not yet meet §5–§7. They are proved with empty public inputs, so the §5 context is carried beside the proof rather than committed by it, and the unitary AIR does not yet enforce the §6.3 constraint sets soundly. Until they do, unitary results rest on quorum and trap tasks, Born / marginal / shot-sampling results on the verifier's native recomputation from the published segment, and composition on `verify_root_proof` verifying every child (§8.2). Their replacement is the state-vector leaf extended to mid-circuit measurement, on the same recursive stack (§11).
 
