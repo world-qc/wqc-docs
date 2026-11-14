@@ -80,14 +80,14 @@ The STARK subsystem guards against malicious worker behaviors, specifically targ
 
 | Output Mode | Primary Leaf Claim | Auxiliary Binding Obligation |
 | --- | --- | --- |
-| `statevector_scalar` | Unitary contraction of a target amplitude scalar. | None. An exact contraction tree adds no segment; the amplitude stays outside the AIR ([`contraction-tree.md`](contraction-tree.md) §7). |
+| `statevector_scalar` | State-vector unitary leaf (§6.6) when the circuit has one: the final state's digest; the node publishes the state and the verifier reads the `\|0…0⟩` amplitude from it. Otherwise (v1): unitary contraction of a target amplitude scalar. | v2: none (the state hashes to the proved digest). v1: none; an exact contraction tree adds no segment, and the amplitude stays outside the AIR ([`contraction-tree.md`](contraction-tree.md) §7). |
 | `sample_counts` (Terminal) | State-vector leaf (sv-stark, §6.4): the final state's digest and the counts of the dispatched seed's shots, in one proof. Unmeasured qubits are marginalized by the sampler. | None; the counts are in the statement. |
 | `sample_counts` (Mid-Circuit) | State-vector leaf over the circuit rewritten by deferring its measurements (§6.5). v1 (when the rewritten circuit has no leaf): unitary segment traces bounded by measurement gates. | None for the state-vector leaf. v1: sequential trajectory event stream + zk marginal/shot proofs. |
-| `expectation` | Algebraic expectation calculation over contracted state. | Result payload digest binding. |
+| `expectation` | State-vector unitary leaf (§6.6) when the circuit has one; the verifier computes each observable from the published state. Otherwise (v1): algebraic expectation calculation over contracted state. | v2: none (the state hashes to the proved digest). v1: result payload digest binding. |
 
 ### 2.4 Implementation Status (2026-11)
 
-A terminal `sample_counts` task (only unitary gates before its `MEASURE`s, whether or not every qubit is measured) is proved by the state-vector leaf (§6.4) and its root (§8.5): the statement commits the dispatch context, the final state's digest, the seed and the counts, and the orchestrator verifies the proof against the statement it builds from the dispatch it signed, the digest and counts the node reported, and the seed it dispatched. That is the first path on which the proof, not the quorum, carries the result. A terminal task whose circuit needs no rounding step (X, Z, CNOT, CZ and the like only) has no state-vector leaf and stays on the v1 Born path of §7, as does every task when the orchestrator runs with v2 off or under validity-proof settlement ([`p2p-protocols.md`](p2p-protocols.md) §6.1).
+A terminal `sample_counts` task (only unitary gates before its `MEASURE`s, whether or not every qubit is measured) is proved by the state-vector leaf (§6.4) and its root (§8.5): the statement commits the dispatch context, the final state's digest, the seed and the counts, and the orchestrator verifies the proof against the statement it builds from the dispatch it signed, the digest and counts the node reported, and the seed it dispatched. That is the first path on which the proof, not the quorum, carries the result. A `statevector_scalar` or `expectation` task with a state-vector leaf is proved the same way, the node publishing its final state so the verifier can read the values off the proved digest (§6.6). A terminal task whose circuit needs no rounding step (X, Z, CNOT, CZ and the like only) has no state-vector leaf and stays on the v1 Born path of §7, as does every task when the orchestrator runs with v2 off or under validity-proof settlement ([`p2p-protocols.md`](p2p-protocols.md) §6.1).
 
 The other leaf STARKs (§6.1–§6.3, §7) do not yet meet §5–§7. They are proved with empty public inputs, so the §5 context is carried beside the proof rather than committed by it, and the unitary AIR does not yet enforce the §6.3 constraint sets soundly. Until they do, unitary results rest on quorum and trap tasks, Born / marginal / shot-sampling results on the verifier's native recomputation from the published segment, and composition on `verify_root_proof` verifying every child (§8.2). A mid-circuit `sample_counts` task is proved by the state-vector leaf too, over its circuit rewritten with measurements deferred (§6.5, capability bit 6), when that rewritten circuit has a leaf; the trajectory proof (§7.4) remains for the rest.
 
@@ -312,6 +312,16 @@ A `sample_counts` circuit with mid-circuit semantics (`RESET`, `IF`, or a unitar
 
 The rewriting is exact because no gate may touch a measured qubit before its `RESET` ([`circuit-payload.md`](circuit-payload.md) §2.1): a measured qubit stays frozen in the Z basis, so measuring it at the end or using it as a quantum control gives the register the distribution the per-shot simulation samples, and an ancilla left unmeasured is traced out as `RESET` discards the old value. The counts are the leaf's sampling of that distribution, so they differ from the per-shot simulator's for the same seed. Each ancilla doubles the gate rows, and the qubit and row limits of §6.4 count the ancillas. A circuit without mid-circuit semantics is read exactly as before, so its leaf and digest are unchanged.
 
+
+### 6.6 Scalar and Expectation Results on the State-Vector Leaf
+
+A `statevector_scalar` or `expectation` task with a state-vector leaf is proved by the unitary leaf of §6.4 (no sampling), whose statement is `[context(4), digest(4)]`. The digest binds the final state but not the value the task reports, so the node also publishes the final integer state ([`p2p-protocols.md`](p2p-protocols.md) §7). The verifier checks that the state hashes to the proved digest and computes the values from it with `wqc-sv-stark`'s `outputs` (its README is normative):
+
+* the `|0…0⟩` amplitude, the state's first amplitude divided by $2^{28}$;
+* for each observable, $\sum_k c_k \langle\psi|P_k|\psi\rangle$ with $\langle\psi|P|\psi\rangle = \sum_i \overline{\psi_{P(i)}}\,\varphi_i\,\psi_i$ ([`circuit-payload.md`](circuit-payload.md) §7), summed exactly in integers and scaled once;
+* every value rounded onto the $10^{-6}$ grid.
+
+A node's reported values must equal these exactly. The leaf, its root (§8.5) and its format are unchanged; the published state is the only addition, gated by capability bit 7. The state is revealed, which WQC's results never hid.
 ---
 
 ## 7. Distribution and Trajectory Subsystems

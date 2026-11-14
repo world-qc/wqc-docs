@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-13
-- **Verified against:** `wqc-orchestrator@81df70a` `wqc-node@ed2449e` `wqc-core@4628973` `wqc-stark-engine@96b47aa` on `feature/sv-stark-dynamic` (bit 6, core `sv_dynamic`, mid-circuit circuits rewritten by `wire::parse_leaf`). Prior snapshot: `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf); `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified:** 2026-11-14
+- **Verified against:** `wqc-orchestrator@c49d822` `wqc-node@bf7efba` `wqc-core@29758fa` `wqc-stark-engine@dadf280` on `feature/sv-stark-scalar` (bit 7, core `sv_state_outputs`, `proof.sv_state_b64`, `WQC_SV_STATE_OUTPUTS_MAX_ROWS`). Prior snapshot: `wqc-orchestrator@81df70a` `wqc-node@ed2449e` `wqc-core@4628973` `wqc-stark-engine@96b47aa` on `feature/sv-stark-dynamic` (bit 6, core `sv_dynamic`, mid-circuit circuits rewritten by `wire::parse_leaf`); `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf); `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -317,6 +317,7 @@ bids only if it expects to finish in time ([`work-budget.md`](work-budget.md)).
 | `1 << 4` | work budget | — (set when core `GET /sysinfo` reports `tn_seconds_per_byte` and `tn_seconds_per_flop` within bounds) | the announcement carries `work` ([`work-budget.md`](work-budget.md)) |
 | `1 << 5` | sv-stark v2 leaf | — (set when core `GET /sysinfo` reports `sv_seconds_per_row` and the node's `sv_max_rows` from it is nonzero; the bid then carries `sv_max_rows`) | the task's unsliced sub-task is a v2 leaf (§6.1): every bidder must prove v2 leaves, and the sub-task goes only to nodes whose `sv_max_rows` covers it |
 | `1 << 6` | sv-stark v2 mid-circuit leaf | — (set with bit 5 when core `GET /sysinfo` also reports `sv_dynamic: true`) | the v2 task's circuit has mid-circuit semantics (§6.1): every bidder must prove its rewritten leaf |
+| `1 << 7` | sv-stark v2 state outputs | — (set with bit 5 when core `GET /sysinfo` also reports `sv_state_outputs: true`) | the v2 task is `statevector_scalar` or `expectation` (§6.1): every bidder must prove its unitary leaf and publish the final state (§7) |
 
 Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
 
@@ -368,8 +369,9 @@ on `W`); a larger value selects nothing more. It is unsigned and omitted when 0.
 The reference node takes the smaller of two bounds, both from core
 `GET /sysinfo`. Core measures `sv_seconds_per_row` at startup by proving a
 small leaf (n = 12, 8 rounding steps, 1024 shots), and reports
-`sv_bytes_per_row` and `sv_base_bytes`, and `sv_dynamic: true` when it also proves
-mid-circuit circuits (bit 6):
+`sv_bytes_per_row` and `sv_base_bytes`, `sv_dynamic: true` when it also proves
+mid-circuit circuits (bit 6), and `sv_state_outputs: true` when it also proves
+`statevector_scalar` and `expectation` tasks with a published state (bit 7):
 
 - Memory: `sv_base_bytes + sv_bytes_per_row · W` fits 80% of the node's RAM
   budget.
@@ -434,7 +436,12 @@ A task is a **v2 task** when all of these hold at submission:
 - It is `sample_counts` without noise, with 1 to 2^16 shots, 1 to 16 classical
   bits and at least one `MEASURE`. Qubits that are not measured, or that no gate
   touches, are allowed: the leaf samples the whole state and counts only the
-  measured bits.
+  measured bits. Or it is `statevector_scalar` or `expectation` (with at least
+  one observable) without noise or `MEASURE`: a unitary leaf, whose node also
+  publishes the final state (§7). For these `W` is also capped by the
+  orchestrator's `WQC_SV_STATE_OUTPUTS_MAX_ROWS` (2^17 by default): a larger
+  circuit stays v1 (MPS, contraction), which can run it, rather than fail for
+  want of a node whose `sv_max_rows` covers `W`.
 - The circuit has a v2 leaf, with at least one rounding step (a circuit of X, Z,
   CNOT, CZ and the like alone has none) and `W` (gate rows: rounding steps ×
   2^(n−1), from `libwqc_stark_verifier`'s `wqc_sv_leaf_rows`) at most 2^22. A
@@ -445,8 +452,10 @@ A task is a **v2 task** when all of these hold at submission:
   the ancillas.
 
 A v2 task is proved as a v2 leaf and nothing else. Its announcement sets bit 5
-in `required_features`, and bit 6 too when its circuit has mid-circuit
-semantics, so only nodes that prove such leaves bid. With no such bidder the task gets no bids and fails at bid collection, as any task whose required features no node has; an orchestrator built with mid-circuit leaves therefore needs nodes that set bit 6 before it takes such tasks. The
+in `required_features`, bit 6 too when its circuit has mid-circuit semantics,
+and bit 7 when it is `statevector_scalar` or `expectation`, so only nodes that
+prove such leaves bid. A v2 task carries no contraction tree, MPS time split or
+site order, and announces no tree work. With no such bidder the task gets no bids and fails at bid collection, as any task whose required features no node has; an orchestrator built with mid-circuit leaves therefore needs nodes that set bit 6 before it takes such tasks. The
 announcement does not carry `W`; at dispatch the orchestrator takes a quorum
 group from the bidders with `sv_max_rows ≥ W` and waits for idle ones when
 there are too few. When no bidder at all, busy or idle, has `sv_max_rows ≥ W`,
@@ -520,6 +529,18 @@ proof against the dispatch, `sv_digest`, `sample_seed`, and the canonical counts
 JSON, `{"counts":{…},"shots":N}` with keys of exactly `classical_bit_count` bits in
 order and no zero counts. It does not run the v1 unitary verifier or the
 distribution binding for it. The quorum compares the counts as for v1.
+
+A `statevector_scalar` or `expectation` v2 leaf result carries `sv_digest` the
+same way and, in `proof.sv_state_b64`, the final state: `16 · 2^qubit_count`
+bytes in base64, each amplitude `re` then `im` as `i64` little-endian in units of
+`2^-28`. The orchestrator checks the unitary proof against the dispatch and
+`sv_digest`, checks that the state hashes to `sv_digest`, computes the `|0…0⟩`
+amplitude and each observable's value from it (`wqc_sv_state_outputs`;
+[`zk-STARK.md`](zk-STARK.md) §6.6), and rejects the result unless
+`complex_result` and `expectation_result` are exactly those values. It does not
+store the state; the stored proof binds its digest. At n = 16 the state is 1 MiB,
+about 1.8 MiB in the proxy's frame, within its 64 MiB limit. The quorum then
+compares the values as for v1; every honest node reports the same ones.
 
 `work_report` feeds gas settlement. Only `trace_rows` and `gate_count` are deterministic
 and therefore settlement-relevant; the wall-clock fields are audit-only. Nodes also send
