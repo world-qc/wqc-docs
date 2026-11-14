@@ -195,6 +195,12 @@ Labels use the **same Qiskit order as `counts` keys**: the **rightmost** charact
 applies to **qubit 0**. So on a two-qubit register, `"IX"` means `X` on qubit 0 and
 identity on qubit 1.
 
+The value of a term is `⟨ψ|P|ψ⟩` on the final state `ψ`. Writing `P|i⟩ = phase_i |P(i)⟩` for
+basis state `i` (`X` and `Y` flip a bit; `Z` gives −1 on a set bit; `Y` gives `i` on a clear
+bit and `−i` on a set one), it is `Σ_i conj(ψ_{P(i)}) · phase_i · ψ_i`. The sum is real; an
+observable's value is `Σ coeff_k · ⟨ψ|P_k|ψ⟩`, so its imaginary part comes from the
+coefficients only. Results are on the `1e-6` grid of [§4](#4-determinism-and-quorum).
+
 Observable `id` must be unique within a request, and results are keyed by it. An
 observable with no terms, an unknown Pauli character, or a length mismatch is rejected.
 `expectation` also forbids `MEASURE` gates entirely.
