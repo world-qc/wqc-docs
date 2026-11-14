@@ -437,8 +437,9 @@ A task is a **v2 task** when all of these hold at submission:
   bits and at least one `MEASURE`. Qubits that are not measured, or that no gate
   touches, are allowed: the leaf samples the whole state and counts only the
   measured bits. Or it is `statevector_scalar` or `expectation` (with at least
-  one observable) without noise or `MEASURE`: a unitary leaf, whose node also
-  publishes the final state (§7). For these `W` is also capped by the
+  one observable) without noise, `MEASURE`, `RESET` or `IF`: a unitary leaf,
+  whose node also publishes the final state (§7). A `RESET` or `IF` keeps such a
+  task v1. For these `W` is also capped by the
   orchestrator's `WQC_SV_STATE_OUTPUTS_MAX_ROWS` (2^17 by default): a larger
   circuit stays v1 (MPS, contraction), which can run it, rather than fail for
   want of a node whose `sv_max_rows` covers `W`.

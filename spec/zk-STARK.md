@@ -312,16 +312,16 @@ A `sample_counts` circuit with mid-circuit semantics (`RESET`, `IF`, or a unitar
 
 The rewriting is exact because no gate may touch a measured qubit before its `RESET` ([`circuit-payload.md`](circuit-payload.md) §2.1): a measured qubit stays frozen in the Z basis, so measuring it at the end or using it as a quantum control gives the register the distribution the per-shot simulation samples, and an ancilla left unmeasured is traced out as `RESET` discards the old value. The counts are the leaf's sampling of that distribution, so they differ from the per-shot simulator's for the same seed. Each ancilla doubles the gate rows, and the qubit and row limits of §6.4 count the ancillas. A circuit without mid-circuit semantics is read exactly as before, so its leaf and digest are unchanged.
 
-
 ### 6.6 Scalar and Expectation Results on the State-Vector Leaf
 
 A `statevector_scalar` or `expectation` task with a state-vector leaf is proved by the unitary leaf of §6.4 (no sampling), whose statement is `[context(4), digest(4)]`. The digest binds the final state but not the value the task reports, so the node also publishes the final integer state ([`p2p-protocols.md`](p2p-protocols.md) §7). The verifier checks that the state hashes to the proved digest and computes the values from it with `wqc-sv-stark`'s `outputs` (its README is normative):
 
 * the `|0…0⟩` amplitude, the state's first amplitude divided by $2^{28}$;
-* for each observable, $\sum_k c_k \langle\psi|P_k|\psi\rangle$ with $\langle\psi|P|\psi\rangle = \sum_i \overline{\psi_{P(i)}}\,\varphi_i\,\psi_i$ ([`circuit-payload.md`](circuit-payload.md) §7), summed exactly in integers and scaled once;
+* for each observable, $\sum_k c_k \langle\psi|P_k|\psi\rangle$ with $\langle\psi|P|\psi\rangle = \sum_i \overline{\psi_{P(i)}}\,\varphi_i\,\psi_i$, where $P|i\rangle = \varphi_i|P(i)\rangle$ (labels in the order of [`circuit-payload.md`](circuit-payload.md) §7; the formula is `outputs::pauli_expectation` in the README), summed exactly in integers and scaled once;
 * every value rounded onto the $10^{-6}$ grid.
 
 A node's reported values must equal these exactly. The leaf, its root (§8.5) and its format are unchanged; the published state is the only addition, gated by capability bit 7. The state is revealed, which WQC's results never hid.
+
 ---
 
 ## 7. Distribution and Trajectory Subsystems
@@ -481,7 +481,7 @@ When the gate is active and estimated RAM exceeds the budget, `WQC_PCS_MEMORY_PO
 
 ### 8.5 State-Vector Root (v2)
 
-A task whose leaves are state-vector leaves (§6.4) has a v2 root instead of the v3 / v6 tree above. The composer puts one recursion layer over each leaf proof, then aggregates the layers two at a time (an odd one is carried up) until one proof remains; a single leaf's root is its layer. The root's statement is the concatenation of the leaves' statements in leaf order, so it names every dispatch context, digest, seed and counts digest the leaves proved. The root bytes (`application/wqc-sv-root-v2`) are every recursion proof of the tree, layers first, root last.
+A task whose leaves are state-vector leaves (§6.4) has a v2 root instead of the v3 / v6 tree above. The composer puts one recursion layer over each leaf proof, then aggregates the layers two at a time (an odd one is carried up) until one proof remains; a single leaf's root is its layer. The root's statement is the concatenation of the leaves' statements in leaf order, so it names every dispatch context, digest, seed and counts digest the leaves proved; a unitary leaf (`statevector_scalar`, `expectation`, §6.6) contributes its context and digest only. The root bytes (`application/wqc-sv-root-v2`) are every recursion proof of the tree, layers first, root last.
 
 The verifier rebuilds the tree from the leaves' circuits: for each leaf it derives the layer's verifier from the leaf's verifier (§6.4, never from the prover), checks the carried intermediate proof against the statement it expects, and uses the verified layer as the child of the next aggregation, up to the root. The orchestrator builds the expected statements from the results it accepted (the winning dispatch inputs and the final counts of each slice), so a leaf proof that does not carry them yields a root it rejects (`wqc_sv_verify_root`). The orchestrator also compares the estimated peak of that verification (`wqc_sv_root_peak_bytes`, about 320 MB for one leaf) with the memory it can spare before it dispatches the task.
 
