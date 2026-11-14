@@ -12,9 +12,9 @@
       "name": "core",
       "repo": "world-qc/wqc-core",
       "path": "openapi/openapi.yaml",
-      "sha": "82512b2aa623a1fbff4fa7bb8a0c112bc12bc985",
+      "sha": "d6701fac723184460ef395fbaa160c9774f26fa7",
       "file": "core.yaml"
     }
   ],
-  "synced_at": "2026-11-11T17:13:08Z"
+  "synced_at": "2026-11-14T11:17:02Z"
 }
