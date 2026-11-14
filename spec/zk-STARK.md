@@ -82,14 +82,14 @@ The STARK subsystem guards against malicious worker behaviors, specifically targ
 | --- | --- | --- |
 | `statevector_scalar` | Unitary contraction of a target amplitude scalar. | None. An exact contraction tree adds no segment; the amplitude stays outside the AIR ([`contraction-tree.md`](contraction-tree.md) §7). |
 | `sample_counts` (Terminal) | State-vector leaf (sv-stark, §6.4): the final state's digest and the counts of the dispatched seed's shots, in one proof. Unmeasured qubits are marginalized by the sampler. | None; the counts are in the statement. |
-| `sample_counts` (Mid-Circuit) | Unitary segment traces bounded by measurement gates. | Sequential trajectory event stream + zk marginal/shot proofs. |
+| `sample_counts` (Mid-Circuit) | State-vector leaf over the circuit rewritten by deferring its measurements (§6.5). v1 (when the rewritten circuit has no leaf): unitary segment traces bounded by measurement gates. | None for the state-vector leaf. v1: sequential trajectory event stream + zk marginal/shot proofs. |
 | `expectation` | Algebraic expectation calculation over contracted state. | Result payload digest binding. |
 
 ### 2.4 Implementation Status (2026-11)
 
 A terminal `sample_counts` task (only unitary gates before its `MEASURE`s, whether or not every qubit is measured) is proved by the state-vector leaf (§6.4) and its root (§8.5): the statement commits the dispatch context, the final state's digest, the seed and the counts, and the orchestrator verifies the proof against the statement it builds from the dispatch it signed, the digest and counts the node reported, and the seed it dispatched. That is the first path on which the proof, not the quorum, carries the result. A terminal task whose circuit needs no rounding step (X, Z, CNOT, CZ and the like only) has no state-vector leaf and stays on the v1 Born path of §7, as does every task when the orchestrator runs with v2 off or under validity-proof settlement ([`p2p-protocols.md`](p2p-protocols.md) §6.1).
 
-The other leaf STARKs (§6.1–§6.3, §7) do not yet meet §5–§7. They are proved with empty public inputs, so the §5 context is carried beside the proof rather than committed by it, and the unitary AIR does not yet enforce the §6.3 constraint sets soundly. Until they do, unitary results rest on quorum and trap tasks, Born / marginal / shot-sampling results on the verifier's native recomputation from the published segment, and composition on `verify_root_proof` verifying every child (§8.2). Their replacement is the state-vector leaf extended to mid-circuit measurement, on the same recursive stack (§11).
+The other leaf STARKs (§6.1–§6.3, §7) do not yet meet §5–§7. They are proved with empty public inputs, so the §5 context is carried beside the proof rather than committed by it, and the unitary AIR does not yet enforce the §6.3 constraint sets soundly. Until they do, unitary results rest on quorum and trap tasks, Born / marginal / shot-sampling results on the verifier's native recomputation from the published segment, and composition on `verify_root_proof` verifying every child (§8.2). A mid-circuit `sample_counts` task is proved by the state-vector leaf too, over its circuit rewritten with measurements deferred (§6.5, capability bit 6), when that rewritten circuit has a leaf; the trajectory proof (§7.4) remains for the rest.
 
 ---
 
@@ -301,6 +301,17 @@ The state-vector leaf proves a whole sub-task at once: applying the dispatched c
 * **Size.** $1 \le n \le 16$ qubits, $W \le 2^{22}$ gate rows ($W$ = rounding steps $\times\ 2^{n-1}$; monomial gates such as X, Z, CNOT, CZ add no rows), $1 \le$ `shots` $\le 2^{16}$, $1 \le$ `cbits` $\le 16$. A node advertises the $W$ it proves (`sv_max_rows`); the orchestrator dispatches a leaf only to nodes that cover it ([`p2p-protocols.md`](p2p-protocols.md) §6.1).
 * **Gate fusion.** Runs of single-qubit gates on a qubit are multiplied in `f64` by one fixed rule and rounded once, and monomial gates are folded into a permutation-and-phase frame. The rule is part of the leaf format: changing it changes digests, so a new rule needs a new capability bit.
 
+### 6.5 Mid-Circuit Circuits on the State-Vector Leaf
+
+A `sample_counts` circuit with mid-circuit semantics (`RESET`, `IF`, or a unitary gate after a `MEASURE`) is proved by the state-vector leaf of §6.4 over the circuit `wqc-sv-stark`'s `wire::parse_leaf` rewrites it into, which defers every measurement to the end. The orchestrator, the node and the composer all derive the leaf from the signed circuit through that function; its README is normative. The rewriting is part of the leaf format (capability bit 6, [`p2p-protocols.md`](p2p-protocols.md) §4).
+
+* `MEASURE q → c` emits nothing; `c` is now held by `q`.
+* `IF(c == v) U` emits `U` with the qubit holding `c` added to its controls, between two X on that qubit when `v == 0`. A cbit never measured is 0, so `U` is kept for `v == 0` and dropped for `v == 1`. `U` is a one-qubit gate, CNOT or CZ; an IF of CCNOT has no state-vector leaf.
+* `RESET q` emits nothing when `q` is untouched since the start or its last `RESET`; otherwise it swaps `q` into a fresh ancilla (two CNOTs), which keeps every cbit `q` held. No gate targets the ancilla again; it can only be the control an IF on one of those cbits adds. "Untouched" is conservative: a qubit used only as a control counts as touched.
+* Each measured cbit is measured at the end from the qubit holding it.
+
+The rewriting is exact because no gate may touch a measured qubit before its `RESET` ([`circuit-payload.md`](circuit-payload.md) §2.1): a measured qubit stays frozen in the Z basis, so measuring it at the end or using it as a quantum control gives the register the distribution the per-shot simulation samples, and an ancilla left unmeasured is traced out as `RESET` discards the old value. The counts are the leaf's sampling of that distribution, so they differ from the per-shot simulator's for the same seed. Each ancilla doubles the gate rows, and the qubit and row limits of §6.4 count the ancillas. A circuit without mid-circuit semantics is read exactly as before, so its leaf and digest are unchanged.
+
 ---
 
 ## 7. Distribution and Trajectory Subsystems
@@ -336,6 +347,8 @@ Non-unitary dynamic circuits split execution into state trajectory segments cont
 $$\text{Event}_k = \left\{ \text{qubit}_k,\, \text{outcome}_k,\, \text{state\_digest}_k,\, p_0,\, p_1 \right\} \quad \text{}$$
 
 Trajectory zk extensions evaluate Z-basis marginals per event and enforce $u \sim U[0, 1)$ Bernoulli draws driven by $\texttt{StdRng}(\texttt{shot\_seed})$ via gap-bit decomposition AIRs. Caps enforce $\le 16$ qubits for trajectory marginals and $\le 2048$ measurement events per path.
+
+This is the v1 path. A mid-circuit circuit whose rewritten form has a state-vector leaf (§6.5) is proved by that leaf instead; the trajectory proof remains for the rest: noisy circuits, an IF of CCNOT, more than 16 qubits with ancillas, more than $2^{22}$ gate rows, no rounding step, and orchestrators running with v2 off.
 
 ---
 
