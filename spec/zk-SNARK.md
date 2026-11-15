@@ -430,13 +430,18 @@ composer proves the wrap chain and exports the SNARK witness with the root; the 
 verifies root and chain together (`wqc_sv_verify_wrap`), records the wrap digest and commits
 it at settle; the wrap worker (`WQC_WRAP_PROVE_MODE=v2`) proves the witness for that digest;
 finalize checks the proof is for it. The worker's `WQC_WRAP_KEYS_DIR` holds the output of
-`cmd/wrapv2-keys -write-pk` (`circuit.json.gz`, `pk.bin`, `vk.bin`); it compiles the circuit
-at start (1 m 18 s on the machine above) before serving.
+`cmd/wrapv2-keys -write-pk` (`circuit.json.gz`, `pk.bin` as a gnark dump, `vk.bin`); it
+compiles the circuit and loads the keys before serving (about 3 m on the machine above, peak
+34.5 GiB with a proof).
 
 Tasks without a wrap digest (v1 tasks, v2 roots over more than four leaves, roots whose wrap
 the composer could not prove) are not settled on chain in that mode. SettlementV4 has no
-timeout refund, so an escrow locked for such a task stays locked. No network runs it yet;
-the devnet rehearsal comes next.
+timeout refund, so an escrow locked for such a task stays locked.
+
+A devnet rehearsal (Anvil, SettlementV4 and WrapV2Verifier from a fresh test-only setup) ran
+a two-qubit `sample_counts` task with an ERC-2612 escrow from submit to `Finalized` in
+5 m 34 s: settle after 1 m 44 s, the v2 proof in 3 m 40 s on an 8 vCPU / 64 GB host,
+`finalizeWithProof` 489,979 gas as a transaction. No public network runs it yet.
 
 ---
 
