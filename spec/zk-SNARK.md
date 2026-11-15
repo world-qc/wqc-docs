@@ -412,9 +412,9 @@ the accepted results and the wrap proof recomputes it.
 ### 11.5 Implementation status
 
 The wrap chain and the SNARK export are in `wqc-sv-stark` (`wrap`, `snark`); the circuit in
-`wqc-snark-wrap` (`wrapv2`) has 24,718,632 R1CS (test-only setup on 8 vCPU / 64 GB: setup
-1 h 12 m, prove 3 m 38 s, proof 196 bytes); SettlementV4 and `WrapV2Verifier` are in
-`wqc-contracts`. The keys are a test-only setup, not a ceremony. Orchestrator and worker
+`wqc-snark-wrap` (`wrapv2`) has 24,718,556 R1CS (test-only setup on 8 vCPU / 64 GB: setup
+52 m, prove 2 m 39 s); SettlementV4 and `WrapV2Verifier` are in `wqc-contracts`
+(`finalizeWithProof` 393,521 gas). The keys are a test-only setup, not a ceremony. Orchestrator and worker
 wiring, and the switch of validity-proof settlement to v2 tasks, are not done; until then
 those tasks stay on v1.
 
