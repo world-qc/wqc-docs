@@ -359,16 +359,18 @@ Goldilocks² (Poseidon2 width 8):
    Poseidon2 (observe each base element in order, then sample four). $D$ binds the child's
    statement and its relation.
 2. **Normalizing layers.** Two recursion layers over the digest layer, at the recursion FRI
-   parameters (rate 1/8, 28 queries, 16-bit query PoW). After them every proof has one shape,
-   whatever the leaves, tiers and tree.
+   parameters (rate 1/8, 28 queries, 16-bit query PoW). After them every proof has one shape
+   (measured for every tier with 1 to 4 leaves). A root whose proofs do not reach that shape is
+   refused by the prover and the verifier alike (fail-closed): it cannot be wrapped.
 3. **Stages.** The first stage runs over the root: $D_1$ binds the root's statement and the
-   root's verifying key. The second runs over the first stage's last proof: its digest layer
-   sees only the fixed shape, so its circuit, and every layer above it, is the same for every
-   task. The **wrap digest** is $D_2 = \mathrm{Sponge}(D_1 \,\|\, \text{the first stage's
-   verifying key})$.
+   root's preprocessed commitment. The second runs over the first stage's last proof: its
+   digest layer sees only the fixed shape, so its circuit, and every layer above it, is the
+   same for every task. The **wrap digest** is $D_2 = \mathrm{Sponge}(D_1 \,\|\,
+   \text{the preprocessed commitment of the first stage's last layer})$; the table public
+   values it observes are $D_1$ alone.
 4. **Top layer.** One recursion layer with FRI rate 1/64 and 14 queries (16-bit PoW), so the
-   SNARK opens half the Merkle paths. Its statement is $D_2$; its verifying key is one
-   constant for every task.
+   SNARK opens half the Merkle paths. Its statement is $D_2$. Because of (3), its preprocessed
+   commitment is one constant for every task, the **top commitment**.
 
 A verifier of a task rebuilds every layer from the task's leaves and checks each carried proof
 (`wrap::verify_wrap`), as for the root; the top's statement is the task's wrap digest.
@@ -381,7 +383,7 @@ Poseidon2 rows (permutation, input and output lookups, Merkle direction bit, spo
 chaining) become constraints, as the Poseidon2 and circuit AIRs state them; hints and private
 inputs are free, as in the STARK. The circuit's public inputs at the top statement's positions
 are the SNARK's public inputs; those at the top preprocessed commitment's positions are the
-constant of §11.1(4). Every other public input of that circuit (the top proof itself) is
+top commitment of §11.1(4). Every other public input of that circuit (the top proof itself) is
 private to the SNARK.
 
 Pinning the commitment is required: the circuit fixes the top proof's shape, and the
@@ -408,6 +410,12 @@ the accepted results and the wrap proof recomputes it.
 - **`finalizeWithProof(taskId, proof)`.** After the window, the contract verifies `proof`
   (384 bytes: A, B, C, the Pedersen commitment and its proof of knowledge) against the
   committed digest with the deployed `WrapV2Verifier`, then pays out.
+- **What the proof binds.** The wrap digest only. `rootHash` and `receiptHash` are stored and
+  emitted as the relayer's claims (in §9.1 they are public inputs), and the receipt's fee split
+  is not in the digest; both are checked off-chain in the challenge window.
+- **Resolution.** As in §9.1, the resolver settles a challenge: upheld, the escrow is refunded;
+  rejected, the bond goes to the resolver and the task pays out without a proof. That path
+  trusts the resolver.
 
 ### 11.5 Implementation status
 
