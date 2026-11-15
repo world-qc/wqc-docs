@@ -339,7 +339,96 @@ layer only changes **how root validity is established** before economic finalize
 
 ---
 
-## 11. Non-goals and future work
+## 11. v2 wrap (state-vector roots, SettlementV4)
+
+A v2 root ([`zk-STARK.md`](zk-STARK.md) §8.5) is a Goldilocks² FRI recursion proof: its
+verifying key depends on the task (the leaf circuits fix every layer's preprocessed
+commitment), and its statement is the leaf statements concatenated. The v2 wrap reduces it to
+one Groth16 (BN254) circuit fixed for every task, whose only public input is a 4-element
+**wrap digest**.
+
+### 11.1 Wrap chain
+
+The chain is two stages and a top layer, all Plonky3-recursion batch-STARK layers over
+Goldilocks² (Poseidon2 width 8):
+
+1. **Digest layer.** It verifies its child with the child's relation read from the proof's
+   shape and the child's preprocessed commitment as an input, and exports
+   $D = \mathrm{Sponge}(\text{every table's public values} \,\|\, \text{the child's preprocessed commitment})$,
+   four Goldilocks elements. The sponge is a fresh duplex challenger over the recursion's
+   Poseidon2 (observe each base element in order, then sample four). $D$ binds the child's
+   statement and its relation.
+2. **Normalizing layers.** Two recursion layers over the digest layer, at the recursion FRI
+   parameters (rate 1/8, 28 queries, 16-bit query PoW). After them every proof has one shape
+   (measured for every tier with 1 to 4 leaves). A root whose proofs do not reach that shape is
+   refused by the prover and the verifier alike (fail-closed): it cannot be wrapped.
+3. **Stages.** The first stage runs over the root: $D_1$ binds the root's statement and the
+   root's preprocessed commitment. The second runs over the first stage's last proof: its
+   digest layer sees only the fixed shape, so its circuit, and every layer above it, is the
+   same for every task. The **wrap digest** is $D_2 = \mathrm{Sponge}(D_1 \,\|\,
+   \text{the preprocessed commitment of the first stage's last layer})$; the table public
+   values it observes are $D_1$ alone.
+4. **Top layer.** One recursion layer with FRI rate 1/64 and 14 queries (16-bit PoW), so the
+   SNARK opens half the Merkle paths. Its statement is $D_2$. Because of (3), its preprocessed
+   commitment is one constant for every task, the **top commitment**.
+
+A verifier of a task rebuilds every layer from the task's leaves and checks each carried proof
+(`wrap::verify_wrap`), as for the root; the top's statement is the task's wrap digest.
+
+### 11.2 SNARK relation
+
+The SNARK re-runs the verifier circuit of the top proof: every witness slot is a Goldilocks²
+element, and constants, the circuit's public inputs, ALU operations, recomposition rows and
+Poseidon2 rows (permutation, input and output lookups, Merkle direction bit, sponge and Merkle
+chaining) become constraints, as the Poseidon2 and circuit AIRs state them; hints and private
+inputs are free, as in the STARK. The circuit's public inputs at the top statement's positions
+are the SNARK's public inputs; those at the top preprocessed commitment's positions are the
+top commitment of §11.1(4). Every other public input of that circuit (the top proof itself) is
+private to the SNARK.
+
+Pinning the commitment is required: the circuit fixes the top proof's shape, and the
+commitment fixes its relation. Were it an input, a prover could choose a circuit of the same
+shape that verifies nothing and exports any statement.
+
+### 11.3 Binding to the task
+
+Each leaf statement carries the leaf's context, a hash of the dispatch fields (`circuit_id`,
+`sub_task_id`, `node_id`, `slice_id`), and its result (the final state's digest, or the
+sampled counts). The wrap digest therefore binds the task's sub-tasks, the nodes that proved
+them, their circuits and their results, and the root's relation. Anyone holding the dispatch,
+the accepted results and the wrap proof recomputes it.
+
+### 11.4 SettlementV4
+
+- **Encoding.** The wrap digest is a `bytes32`: element $i$ is the big-endian 64-bit word at
+  bytes $8i..8i+8$, each below the Goldilocks prime. The verifier's public inputs are those four
+  words.
+- **`settle(taskId, rootHash, receiptHash, wrapDigest, payoutsHash, …)`.** The relayer commits
+  the wrap digest with the settlement; `settle` rejects a word outside the field.
+- **Challenge window.** A challenger who recomputes a different wrap digest (§11.3) challenges,
+  as for `rootHash` and `receiptHash`.
+- **`finalizeWithProof(taskId, proof)`.** After the window, the contract verifies `proof`
+  (384 bytes: A, B, C, the Pedersen commitment and its proof of knowledge) against the
+  committed digest with the deployed `WrapV2Verifier`, then pays out.
+- **What the proof binds.** The wrap digest only. `rootHash` and `receiptHash` are stored and
+  emitted as the relayer's claims (in §9.1 they are public inputs), and the receipt's fee split
+  is not in the digest; both are checked off-chain in the challenge window.
+- **Resolution.** As in §9.1, the resolver settles a challenge: upheld, the escrow is refunded;
+  rejected, the bond goes to the resolver and the task pays out without a proof. That path
+  trusts the resolver.
+
+### 11.5 Implementation status
+
+The wrap chain and the SNARK export are in `wqc-sv-stark` (`wrap`, `snark`); the circuit in
+`wqc-snark-wrap` (`wrapv2`) has 24,718,556 R1CS (test-only setup on 8 vCPU / 64 GB: setup
+52 m, prove 2 m 39 s); SettlementV4 and `WrapV2Verifier` are in `wqc-contracts`
+(`finalizeWithProof` 393,521 gas). The keys are a test-only setup, not a ceremony. Orchestrator and worker
+wiring, and the switch of validity-proof settlement to v2 tasks, are not done; until then
+those tasks stay on v1.
+
+---
+
+## 12. Non-goals and future work
 
 - In-EVM native STARK verify without wrap.
 - Replacing RecAgg / leaf STARK design (owned by [`zk-STARK.md`](zk-STARK.md)).
@@ -348,7 +437,7 @@ layer only changes **how root validity is established** before economic finalize
 
 ---
 
-## 12. References
+## 13. References
 
 1. WQC [`zk-STARK.md`](zk-STARK.md) — leaf / RecAgg root proof engine.
 2. WQC [`architecture.md`](architecture.md) §6 — verification and settlement contracts.
