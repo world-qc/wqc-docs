@@ -296,9 +296,9 @@ Blobs use the same content-addressed layout as composer/orchestrator:
 | Variable | Meaning |
 | --- | --- |
 | `WQC_SETTLE_VALIDITY_PROOF` | `true` → wrap enqueue + `finalizeWithProof` |
-| `WQC_SETTLE_PROOF_ABI` | `thin` (default) or `packed` (V3 prep) |
+| `WQC_SETTLE_PROOF_ABI` | `thin` (default), `packed` (V3 prep) or `v4` (SettlementV4, §11) |
 | `WQC_WRAP_TIMEOUT_SECS` | Max wait for wrap artifacts before finalize fails |
-| `WQC_SETTLEMENT_CONTRACT` | SettlementV2 (thin) or V3 (packed) address |
+| `WQC_SETTLEMENT_CONTRACT` | SettlementV2 (thin), V3 (packed) or V4 (v4) address |
 
 These names are implementation bindings for the current orchestrator; the protocol
 requirement is equivalent capability, not the env string itself.
@@ -422,9 +422,21 @@ the accepted results and the wrap proof recomputes it.
 The wrap chain and the SNARK export are in `wqc-sv-stark` (`wrap`, `snark`); the circuit in
 `wqc-snark-wrap` (`wrapv2`) has 24,718,556 R1CS (test-only setup on 8 vCPU / 64 GB: setup
 52 m, prove 2 m 39 s); SettlementV4 and `WrapV2Verifier` are in `wqc-contracts`
-(`finalizeWithProof` 393,521 gas). The keys are a test-only setup, not a ceremony. Orchestrator and worker
-wiring, and the switch of validity-proof settlement to v2 tasks, are not done; until then
-those tasks stay on v1.
+(`finalizeWithProof` 393,521 gas). The keys are a test-only setup, not a ceremony.
+
+With `WQC_SETTLE_VALIDITY_PROOF=true` and `WQC_SETTLE_PROOF_ABI=v4` (and
+`WQC_SETTLEMENT_CONTRACT` pointing at SettlementV4) the pipeline runs end to end in code: the
+composer proves the wrap chain and exports the SNARK witness with the root; the orchestrator
+verifies root and chain together (`wqc_sv_verify_wrap`), records the wrap digest and commits
+it at settle; the wrap worker (`WQC_WRAP_PROVE_MODE=v2`) proves the witness for that digest;
+finalize checks the proof is for it. The worker's `WQC_WRAP_KEYS_DIR` holds the output of
+`cmd/wrapv2-keys -write-pk` (`circuit.json.gz`, `pk.bin`, `vk.bin`); it compiles the circuit
+at start (1 m 18 s on the machine above) before serving.
+
+Tasks without a wrap digest (v1 tasks, v2 roots over more than four leaves, roots whose wrap
+the composer could not prove) are not settled on chain in that mode. SettlementV4 has no
+timeout refund, so an escrow locked for such a task stays locked. No network runs it yet;
+the devnet rehearsal comes next.
 
 ---
 
