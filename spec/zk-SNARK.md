@@ -404,7 +404,8 @@ the accepted results and the wrap proof recomputes it.
   `finalizeWithProof`. A rejected challenge therefore never pays without a proof, but the proof
   does not bind the payouts, so a resolver that rejects a valid challenge lets a wrong
   settlement pay. Challenges deter a dishonest relayer; they do not remove the trust placed in
-  the resolver for the settled claims.
+  the resolver for the settled claims, though a payouts dispute can be decided from the
+  committed receipt alone, since it carries each payee's signed binding (§11.6).
 
 ### 11.5 Implementation status
 
@@ -453,15 +454,15 @@ redirect to content-addressed storage) gives:
 
 - the economics receipt, published so that `receiptHash` is the SHA3-256 of its exact bytes
   ([`economics.md`](economics.md) §5.1), with its **payees** (operator and amount);
-- for each payee, its payout binding with the operator's public key and signature
-  (`GET /api/v1/economy/payout/{operator_id}`);
+- in the receipt, each payee's payout binding as it was at finalize (address, chain id, nonce,
+  the operator's public key and signature), which is what settle pays;
 - the wrap evidence: the leaves the root was verified over (each leaf's dispatch fields,
   circuit, result and proof), the root, and the wrap chain.
 
 **Checks**, against the contract's stored task:
 
 1. `receiptHash` is the SHA3-256 of the receipt bytes.
-2. Each payee's binding verifies: `operator_id` is the SHA-256 of the public key, and the
+2. Each payee's binding (carried in the receipt) verifies: `operator_id` is the SHA-256 of the public key, and the
    Ed25519 signature is over the `wqc-payout-v1` register message for the binding's address
    (lowercase hex, as signed), the chain id and its nonce. The payouts are the payees mapped to their addresses, amounts
    summed per address, ordered by lowercase hex address; `payoutsHash` is
@@ -482,12 +483,12 @@ A receipt published before receipts listed payees has none; for such a task chec
 payee half of check 4 are skipped (the settlement's payouts came from the orchestrator's
 ledger and cannot be rebuilt).
 
-**Limitations.** The binding checked is the operator's active one when the challenger checks,
-not the one settle used: an operator that rotates or revokes its payout address between
-settle and the check makes check 2 fail on an honest settlement. Until the receipt carries
-each payee's binding, operators should not change their payout address while a task of
-theirs is in its window. Bindings registered before keys and signatures were published carry
-neither and must be registered again (with a higher nonce).
+Because the bindings are fixed in the receipt at finalize, a payout address changed afterwards
+changes neither what settle pays nor what the challenger checks. For a receipt whose payees do
+not carry bindings (from before they were recorded), the challenger reads each payee's active
+binding from `GET /api/v1/economy/payout/{operator_id}` instead; a binding registered before
+keys and signatures were published carries neither and must be registered again (with a
+higher nonce).
 
 Not checked here: whether each payee's amount follows the fee rules of
 [`economics.md`](economics.md) §§2–4, which needs the dispatch and quorum records of every
