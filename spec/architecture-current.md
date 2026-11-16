@@ -260,14 +260,14 @@ After grace-period finalize, the orchestrator publishes a **separate economics r
 (`receipts/{task_id}.json`). The compute manifest stays immutable. Per-slice economics accumulate
 in Redis (`slice_economics`) during settlement; task meta stores `receipt_hash`.
 
-`receipt_hash` is sha3-256 of the JSON **excluding** `receipt_hash` (same pattern as manifest `root_hash`).
+The receipt is published with `receipt_hash` set to the empty string, and `receipt_hash` is the sha3-256 of exactly the published bytes.
 
 Main receipt fields: `task_id`, `manifest_root_hash`, `client_id`, `base_fee_swqc`,
 `escrow_locked_pwqc` / `escrow_debited_pwqc` / `escrow_refunded_pwqc`,
 `burn_nominal_pwqc` / `burn_settled_pwqc`, `straggler_paid_pwqc`,
-`rewards_quorum_pwqc` / `rewards_pcs_pwqc`, per-slice breakdown, `finalized_at`, `receipt_hash`.
+`rewards_quorum_pwqc` / `rewards_pcs_pwqc`, per-slice breakdown, `payees` (`operator_id`, `amount_pwqc`; what on-chain settle pays), `finalized_at`, `receipt_hash`.
 
-When finalize has finished, `GET /api/v1/task/{id}` adds `receipt_hash` and `receipt_url`.
+When finalize has finished, `GET /api/v1/task/{id}` adds `receipt_hash` and `receipt_url`, and for a task wrapped for SettlementV4, `wrap_evidence` (`wrap_digest`, `root_url`, `wrap_url`, `leaves_url`; [`zk-SNARK.md`](zk-SNARK.md) §11.6). `GET /api/v1/economy/payout/{operator_id}` returns the binding with `operator_pubkey_b64` and `signature_b64`.
 During the grace window, `status` may be `completed` without `receipt_url` yet.
 
 ### 4.6 Ops signals

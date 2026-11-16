@@ -390,17 +390,18 @@ the accepted results and the wrap proof recomputes it.
   words.
 - **`settle(taskId, rootHash, receiptHash, wrapDigest, payoutsHash, …)`.** The relayer commits
   the wrap digest with the settlement; `settle` rejects a word outside the field.
-- **Challenge window.** A challenger who recomputes a different wrap digest (§11.3) challenges,
-  as for `rootHash` and `receiptHash`.
+- **Challenge window.** A challenger (§11.6) checks the settled claims against the published
+  evidence and challenges when a check fails or the evidence cannot be obtained.
 - **`finalizeWithProof(taskId, proof)`.** After the window, the contract verifies `proof`
   (384 bytes: A, B, C, the Pedersen commitment and its proof of knowledge) against the
   committed digest with the deployed `WrapV2Verifier`, then pays out.
 - **What the proof binds.** The wrap digest only. `rootHash` and `receiptHash` are stored and
   emitted as the relayer's claims (in §9.1 they are public inputs), and the receipt's fee split
   is not in the digest; both are checked off-chain in the challenge window.
-- **Resolution.** As in §9.1, the resolver settles a challenge: upheld, the escrow is refunded;
-  rejected, the bond goes to the resolver and the task pays out without a proof. That path
-  trusts the resolver.
+- **Resolution.** The resolver decides a challenge. Upheld, the escrow is refunded and the bond
+  returned. Rejected, the bond goes to the resolver and the task returns to the settled state
+  with its window closed: it cannot be challenged again and pays out only through
+  `finalizeWithProof`. The resolver can stop a task but never makes one pay.
 
 ### 11.5 Implementation status
 
@@ -430,6 +431,46 @@ a two-qubit `sample_counts` task with an ERC-2612 escrow from submit to `Finaliz
 5 m 34 s: settle after 1 m 44 s, the v2 proof in 3 m 40 s on an 8 vCPU / 64 GB host,
 `finalizeWithProof` 489,979 gas as a transaction (with the transaction's base and calldata
 cost, and a payout to each operator that ran the task). No public network runs it yet.
+
+### 11.6 Challenger
+
+A challenger checks a task settled on SettlementV4 during its window, from published data
+only, and challenges (`challenge(taskId)` with the bond) when a check fails or the data cannot
+be obtained before the window closes.
+
+**Evidence.** The orchestrator's task endpoint (`GET /api/v1/task/{id}`, by URL; a URL may
+redirect to content-addressed storage) gives:
+
+- the economics receipt, published so that `receiptHash` is the SHA3-256 of its exact bytes
+  ([`economics.md`](economics.md) §5.1), with its **payees** (operator and amount);
+- for each payee, its payout binding with the operator's public key and signature
+  (`GET /api/v1/economy/payout/{operator_id}`);
+- the wrap evidence: the leaves the root was verified over (each leaf's dispatch fields,
+  circuit, result and proof), the root, and the wrap chain.
+
+**Checks**, against the contract's stored task:
+
+1. `receiptHash` is the SHA3-256 of the receipt bytes.
+2. Each payee's binding verifies: `operator_id` is the SHA-256 of the public key, and the
+   Ed25519 signature is over the `wqc-payout-v1` register message for the binding's address,
+   the chain id and its nonce. The payouts are the payees mapped to their addresses, amounts
+   summed per address, ordered by lowercase hex address; `payoutsHash` is
+   $\mathrm{keccak256}(\mathrm{abi.encode}(	ext{payouts}))$. `burnAmount` and `refundAmount`
+   equal the receipt's `burn_settled_pwqc` and `escrow_refunded_pwqc`.
+3. `rootHash` is the keccak256 of the root, and `wrapDigest` is the digest obtained by
+   verifying the root over the leaves and the wrap chain over the root (§11.1, §11.3).
+4. A challenger that proved a leaf of the task finds that leaf (its sub-task, node id and
+   result) among the evidence's leaves, and its own operator among the payees.
+
+Check 4 is what ties the evidence to the work actually done: checks 1–3 show the settlement is
+consistent with the published evidence, and an honest participant's own leaf shows the
+evidence is the task's. A challenger therefore runs with the miner's node and checks the tasks
+that node worked on; it needs an L2 account funded for the bond, and without one it only
+reports what it would challenge.
+
+Not checked here: whether each payee's amount follows the fee rules of
+[`economics.md`](economics.md) §§2–4, which needs the dispatch and quorum records of every
+slice.
 
 ---
 
