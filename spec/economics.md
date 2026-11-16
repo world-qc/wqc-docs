@@ -129,7 +129,7 @@ Phase 3 keeps a **single orchestrator** for routing. Settlement moves on-chain a
 
 1. **Atomic finalize.** After off-chain work and the economics receipt, one settlement transaction (or one logical settlement action) applies: verify commitment, pay recipients, burn, refund remainder. No mandatory per-slice on-chain debits.
 2. **Optimistic root commitment.** The chain stores `task_id`, `root_hash`, `manifest_digest` / receipt commitment, and the payout vector. Full in-EVM verification of $\pi_{\text{Root}}$ is **out of scope for the initial on-chain design** (current root artifacts are multi-MiB). A challenge window allows dispute via re-verification with the off-chain verifier; unresolved fraud proofs escalate per governance.
-3. **SNARK-wrap validity path.** Mainnet validity finalize verifies a succinct Groth16 wrap $\pi_{\text{snark}}$ of $\pi_{\text{Root}}$ (thin wrap as an intermediate statement; thick wrap toward ≡ `verify_root_proof`). Normative wrap protocol: [`zk-SNARK.md`](zk-SNARK.md).
+3. **SNARK-wrap validity path.** Mainnet validity finalize verifies a succinct Groth16 wrap $\pi_{\text{snark}}$ of $\pi_{\text{Root}}$ (thin wrap as an intermediate statement; the v2 wrap re-runs the v2 root's verifier). Normative wrap protocol: [`zk-SNARK.md`](zk-SNARK.md).
 4. **Signed payout registration.** Operators bind an `0x` payout address with an Ed25519 signature before they can receive on-chain rewards.
 5. **Relayer.** Phase 3 may use the orchestrator (or a designated relayer) to submit settle transactions. Permissionless settle using the same commitments is a compatible extension.
 
