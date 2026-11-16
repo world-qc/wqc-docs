@@ -432,6 +432,12 @@ a two-qubit `sample_counts` task with an ERC-2612 escrow from submit to `Finaliz
 `finalizeWithProof` 489,979 gas as a transaction (with the transaction's base and calldata
 cost, and a payout to each operator that ran the task). No public network runs it yet.
 
+The challenger (§11.6) runs in the miner's node (`WQC_CHALLENGER_*`). In a devnet rehearsal
+with a 120 s window, two tasks were settled by hand: one from the orchestrator's settle plan,
+which the nodes confirmed and left settled, and one with a payout redirected, which a node
+challenged 56 s after the settle (mostly recomputing the wrap digest, four nodes on 4 vCPU);
+upholding the challenge refunded the client.
+
 ### 11.6 Challenger
 
 A challenger checks a task settled on SettlementV4 during its window, from published data
