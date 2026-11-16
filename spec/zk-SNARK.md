@@ -20,8 +20,8 @@ specification until the wrap gate reaches full root parity.
 
 The normative cryptographic stack for the wrap is **gnark Groth16 over BN254**. The
 document distinguishes **thin wrap** (settle-aligned public inputs and RecAgg header
-bindings; host-only PCS payloads not verified in-circuit) from **thick wrap** (Plonky3
-verifier gadgets in-circuit toward equivalence with off-chain `verify_root_proof`).
+bindings; host-only PCS payloads not verified in-circuit) from the **v2 wrap** (§11: the
+verifier circuit of a v2 root's own recursion, re-run in-circuit).
 
 ---
 
@@ -48,8 +48,8 @@ contract a constant-size pairing check plus a fixed public-input vector.
 | **SNARK-wrap settlement** | Same economic finalize, plus $\pi_{\text{snark}}$ at finalize | Groth16 verify of wrap public inputs |
 
 Phase 3 may ship optimistic settle for rehearsal while the wrap track matures. Mainnet
-validity finality is defined by this document’s target (thick wrap ≡ `verify_root_proof`),
-not by thin wrap alone.
+validity finality is defined by this document’s target, the v2 wrap (§6, §11), not by thin
+wrap alone.
 
 ### 1.3 Specification scope
 
@@ -57,7 +57,7 @@ This document specifies:
 
 - Actors and trust boundaries for wrap prove / verify.
 - The wrap **statement** and **public-input** encoding for SettlementV2 thin wrap.
-- Thin vs thick semantic guarantees and explicit non-guarantees.
+- Thin wrap guarantees and explicit non-guarantees; root parity (§6) and the v2 wrap (§11).
 - Cryptographic assumptions (Groth16 / BN254) and trusted-setup boundaries.
 - Off-chain job / CAS wire protocol between orchestrator and wrap worker.
 - On-chain finalize interface (`finalizeWithProof`).
@@ -74,7 +74,7 @@ settlement scope ledger.
 | $\pi_{\text{snark}}$ | Groth16 proof of the wrap circuit |
 | `rootHash` | $\mathrm{keccak256}(\pi_{\text{Root}})$ (Ethereum keccak, not NIST SHA3) |
 | Thin wrap | Circuit `thin_wrap_v0` + SettlementV2 |
-| Thick wrap | In-circuit Plonky3 gadgets toward ≡ `verify_root_proof` |
+| v2 wrap | Circuit `wrapv2` + SettlementV4 (§11) |
 
 Historical engineering gate IDs (E5a / E5b / …) map to these public terms in the settlement
 scope glossary; Tier A status narrative uses the public column only.
@@ -110,7 +110,7 @@ scope glossary; Tier A status narrative uses the public column only.
    (`rootHash` binding).
 2. Substituting RecAgg header digests (task / manifest / child stark digests / compose
    label) relative to the settled task.
-3. (Thick track) Accepting a root that would fail off-chain `verify_root_proof`.
+3. (v2 wrap, §11) Accepting a v2 root that would fail the v2 root verifier.
 
 ### 2.4 Threats not addressed by thin wrap
 
@@ -212,39 +212,24 @@ Under a correct Groth16 setup and VK:
 ### 5.3 Operational status
 
 Thin wrap toolchain, relayer path (`WQC_SETTLE_VALIDITY_PROOF`), and size/gas/latency KPI
-locks may be Done/Partial in the engineering ledger while the **mainnet wrap gate** remains
-blocked on thick root parity, audit, and target-L2 gas. Tier A treats thin as a defined
+locks may be Done/Partial in the engineering ledger while the **mainnet wrap gate** depends
+on the v2 wrap (§11), audit, and target-L2 gas. Tier A treats thin as a defined
 intermediate statement, not as mainnet completion.
 
 ---
 
-## 6. Thick wrap track
+## 6. Root parity
 
-### 6.1 Goal
+The wrap's target is a SNARK whose acceptance implies the same claim as the off-chain root
+verifier for the declared security level. That target is the v2 wrap (§11): its circuit re-runs
+the verifier circuit of the v2 root's recursion, so parity holds by construction for every v2
+root the wrap chain normalizes (§11.1), rather than by a second implementation of the
+verifier.
 
-**Thick wrap** adds Plonky3-in-circuit gadgets (ValMmcs, FriFold, OOD, RecAgg AIR /
-FriFsAuth, leaf Auth, child-verify binds, unified profiles, …) so that accepting
-$\pi_{\text{snark}}$ implies the same claim as off-chain `verify_root_proof` for the
-declared security level and public inputs.
-
-### 6.2 Residual
-
-Working profiles, Auth×2 partials, Max→87KiB soft gates, ceremony / Settlement VK cutover,
-and packed SettlementV3 prep are tracked in the contracts settlement scope §7 (engineering
-IDs). This Tier A document requires only:
-
-- A published circuit family and VK for the production profile.
-- A stated equivalence claim relative to `verify_root_proof`.
-- Gas and latency meeting the target L2 envelope.
-
-Until equivalence is declared, mainnet must not treat thick rehearsal keys as the wrap
-gate.
-
-### 6.3 Packed finalize (cutover prep)
-
-SettlementV3 / packed `proof[12]` adapters are a deployment cutover mechanism for thick N=1
-profiles. They do not change the STARK semantics; they change calldata encoding. Default
-production path remains thin / SettlementV2 until thick cutover is authorized.
+v1 roots (Circle-STARK RecAgg, [`zk-STARK.md`](zk-STARK.md)) have no wrap toward parity. They
+settle on chain only through the thin wrap (§4, §5) or the optimistic path. An earlier track
+that re-implemented the v1 verifier as hand-written gadgets (thick wrap, SettlementV3) is
+withdrawn: it had not reached parity within the circuit budget, and the v2 wrap replaces it.
 
 ---
 
@@ -259,8 +244,8 @@ production path remains thin / SettlementV2 until thick cutover is authorized.
 
 **Trusted setup.** Groth16 requires a circuit-specific SRS. Production deployment requires a
 multi-party ceremony (or an accepted alternative with documented assumptions). Fixtures
-under `fixtures/thin_v0/` (and thick N=1 rehearsal keys) are **POC / private rehearsal
-only** and must not be cited as mainnet soundness.
+under `fixtures/thin_v0/` and the v2 wrap's test-only keys (`fixtures/v2/keys/`) are **POC /
+private rehearsal only** and must not be cited as mainnet soundness.
 
 STARK transparency (no STARK trusted setup) is preserved for $\pi_{\text{Root}}$; the wrap
 layer reintroduces a setup assumption for succinct L2 verify.
@@ -296,9 +281,9 @@ Blobs use the same content-addressed layout as composer/orchestrator:
 | Variable | Meaning |
 | --- | --- |
 | `WQC_SETTLE_VALIDITY_PROOF` | `true` → wrap enqueue + `finalizeWithProof` |
-| `WQC_SETTLE_PROOF_ABI` | `thin` (default), `packed` (V3 prep) or `v4` (SettlementV4, §11) |
+| `WQC_SETTLE_PROOF_ABI` | `thin` (default) or `v4` (SettlementV4, §11) |
 | `WQC_WRAP_TIMEOUT_SECS` | Max wait for wrap artifacts before finalize fails |
-| `WQC_SETTLEMENT_CONTRACT` | SettlementV2 (thin), V3 (packed) or V4 (v4) address |
+| `WQC_SETTLEMENT_CONTRACT` | SettlementV2 (thin) or V4 (v4) address |
 
 These names are implementation bindings for the current orchestrator; the protocol
 requirement is equivalent capability, not the env string itself.
@@ -453,7 +438,7 @@ cost, and a payout to each operator that ran the task). No public network runs i
 - In-EVM native STARK verify without wrap.
 - Replacing RecAgg / leaf STARK design (owned by [`zk-STARK.md`](zk-STARK.md)).
 - DHT multi-orchestrator (architecture post-mainnet).
-- Completing thick ≡ `verify_root_proof` (engineering residual in settlement scope §7).
+- A SNARK wrap of v1 roots toward parity (§6).
 
 ---
 
