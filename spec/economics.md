@@ -121,7 +121,7 @@ Testnet may **accrue** the fee, escrow, and ledger rules from §§2–4 off-chai
 
 ### 5.1 Economics receipt
 
-After finalize, an economics receipt commits to escrow locked / debited / refunded, burns, rewards, and per-slice breakdown, hashed (SHA3-256) separately from the compute manifest. Implementations publish it to CAS; the hash is what later settlement references.
+After finalize, an economics receipt commits to escrow locked / debited / refunded, burns, rewards, per-slice breakdown, and the **payees** (each rewarded operator once, with its total reward, ordered by `operator_id`), hashed (SHA3-256) separately from the compute manifest. The receipt is published with its `receipt_hash` field empty, and the hash is over exactly the published bytes, so a checker hashes the file as downloaded. On-chain settlement pays exactly the payees, each at its registered payout address; the hash is what settlement references.
 
 ### 5.2 On-chain settlement (decided)
 
@@ -130,7 +130,7 @@ Phase 3 keeps a **single orchestrator** for routing. Settlement moves on-chain a
 1. **Atomic finalize.** After off-chain work and the economics receipt, one settlement transaction (or one logical settlement action) applies: verify commitment, pay recipients, burn, refund remainder. No mandatory per-slice on-chain debits.
 2. **Optimistic root commitment.** The chain stores `task_id`, `root_hash`, `manifest_digest` / receipt commitment, and the payout vector. Full in-EVM verification of $\pi_{\text{Root}}$ is **out of scope for the initial on-chain design** (current root artifacts are multi-MiB). A challenge window allows dispute via re-verification with the off-chain verifier; unresolved fraud proofs escalate per governance.
 3. **SNARK-wrap validity path.** Mainnet validity finalize verifies a succinct Groth16 wrap $\pi_{\text{snark}}$ of $\pi_{\text{Root}}$ (thin wrap as an intermediate statement; the v2 wrap re-runs the v2 root's verifier). Normative wrap protocol: [`zk-SNARK.md`](zk-SNARK.md).
-4. **Signed payout registration.** Operators bind an `0x` payout address with an Ed25519 signature before they can receive on-chain rewards.
+4. **Signed payout registration.** Operators bind an `0x` payout address with an Ed25519 signature before they can receive on-chain rewards. The orchestrator publishes each binding with the operator's public key and signature, so anyone can check that a settled payout address is the operator's own.
 5. **Relayer.** Phase 3 may use the orchestrator (or a designated relayer) to submit settle transactions. Permissionless settle using the same commitments is a compatible extension.
 
 Escrow lock / client deposit UX, token contract, burn address, and challenge duration are deployment parameters; they must preserve Planck integer accounting and the 40/40/20 intent above.
