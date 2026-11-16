@@ -471,7 +471,8 @@ redirect to content-addressed storage) gives:
 3. `rootHash` is the keccak256 of the root, and `wrapDigest` is the digest obtained by
    verifying the root over the leaves and the wrap chain over the root (§11.1, §11.3).
 4. A challenger that proved a leaf of the task finds that leaf (its sub-task, node id and
-   result) among the evidence's leaves, and its own operator among the payees.
+   result) among the evidence's leaves, and its own operator among the payees or, without a
+   binding at finalize, among the unbound payees (its reward refunded).
 
 Check 4 is what ties the evidence to the work actually done: checks 1–3 show the settlement is
 consistent with the published evidence, and an honest participant's own leaf shows the
@@ -488,7 +489,9 @@ changes neither what settle pays nor what the challenger checks. For a receipt w
 not carry bindings (from before they were recorded), the challenger reads each payee's active
 binding from `GET /api/v1/economy/payout/{operator_id}` instead; a binding registered before
 keys and signatures were published carries neither and must be registered again (with a
-higher nonce).
+higher nonce). Such a binding is still carried into the receipt when the task finalizes, and
+check 2 then fails on it: the choice is to keep the operator paid at its address and require
+the re-registration before on-chain settlement, rather than refund its reward.
 
 Not checked here: whether each payee's amount follows the fee rules of
 [`economics.md`](economics.md) §§2–4, which needs the dispatch and quorum records of every

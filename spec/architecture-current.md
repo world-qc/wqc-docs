@@ -265,7 +265,7 @@ The receipt is published with `receipt_hash` set to the empty string, and `recei
 Main receipt fields: `task_id`, `manifest_root_hash`, `client_id`, `base_fee_swqc`,
 `escrow_locked_pwqc` / `escrow_debited_pwqc` / `escrow_refunded_pwqc`,
 `burn_nominal_pwqc` / `burn_settled_pwqc`, `straggler_paid_pwqc`,
-`rewards_quorum_pwqc` / `rewards_pcs_pwqc`, per-slice breakdown, `payees` (`operator_id`, `amount_pwqc`, and with on-chain settlement the binding fixed at finalize: `payout_address`, `chain_id`, `nonce`, `operator_pubkey_b64`, `signature_b64`; what on-chain settle pays), `unbound_refund_pwqc` (rewards of operators without a binding, refunded), `finalized_at`, `receipt_hash`.
+`rewards_quorum_pwqc` / `rewards_pcs_pwqc`, per-slice breakdown, `payees` (`operator_id`, `amount_pwqc`, and with on-chain settlement the binding fixed at finalize: `payout_address`, `chain_id`, `nonce`, `operator_pubkey_b64`, `signature_b64`; what on-chain settle pays), `unbound_payees` (`operator_id`, `amount_pwqc` of operators without a binding) and `unbound_refund_pwqc` (their total, refunded), `finalized_at`, `receipt_hash`.
 
 When finalize has finished, `GET /api/v1/task/{id}` adds `receipt_hash` and `receipt_url`, and for a task wrapped for SettlementV4, `wrap_evidence` (`wrap_digest`, `root_url`, `wrap_url`, `leaves_url`; [`zk-SNARK.md`](zk-SNARK.md) §11.6). `GET /api/v1/economy/payout/{operator_id}` returns the binding with `operator_pubkey_b64` and `signature_b64`.
 During the grace window, `status` may be `completed` without `receipt_url` yet.
