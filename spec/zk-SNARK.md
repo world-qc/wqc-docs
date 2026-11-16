@@ -401,7 +401,10 @@ the accepted results and the wrap proof recomputes it.
 - **Resolution.** The resolver decides a challenge. Upheld, the escrow is refunded and the bond
   returned. Rejected, the bond goes to the resolver and the task returns to the settled state
   with its window closed: it cannot be challenged again and pays out only through
-  `finalizeWithProof`. The resolver can stop a task but never makes one pay.
+  `finalizeWithProof`. A rejected challenge therefore never pays without a proof, but the proof
+  does not bind the payouts, so a resolver that rejects a valid challenge lets a wrong
+  settlement pay. Challenges deter a dishonest relayer; they do not remove the trust placed in
+  the resolver for the settled claims.
 
 ### 11.5 Implementation status
 
@@ -424,7 +427,8 @@ same gnark / gnark-crypto versions and CPU architecture that wrote it.
 
 Tasks without a wrap digest (v1 tasks, v2 roots over more than four leaves, roots whose wrap
 the composer could not prove) are not settled on chain in that mode. SettlementV4 has no
-timeout refund, so an escrow locked for such a task stays locked.
+timeout refund, so an escrow locked for such a task stays locked; so does that of a task whose
+challenge was rejected, until someone submits its proof.
 
 A devnet rehearsal (Anvil, SettlementV4 and WrapV2Verifier from a fresh test-only setup) ran
 a two-qubit `sample_counts` task with an ERC-2612 escrow from submit to `Finalized` in
@@ -458,10 +462,10 @@ redirect to content-addressed storage) gives:
 
 1. `receiptHash` is the SHA3-256 of the receipt bytes.
 2. Each payee's binding verifies: `operator_id` is the SHA-256 of the public key, and the
-   Ed25519 signature is over the `wqc-payout-v1` register message for the binding's address,
-   the chain id and its nonce. The payouts are the payees mapped to their addresses, amounts
+   Ed25519 signature is over the `wqc-payout-v1` register message for the binding's address
+   (lowercase hex, as signed), the chain id and its nonce. The payouts are the payees mapped to their addresses, amounts
    summed per address, ordered by lowercase hex address; `payoutsHash` is
-   $\mathrm{keccak256}(\mathrm{abi.encode}(	ext{payouts}))$. `burnAmount` and `refundAmount`
+   $\mathrm{keccak256}(\mathrm{abi.encode}(\text{payouts}))$. `burnAmount` and `refundAmount`
    equal the receipt's `burn_settled_pwqc` and `escrow_refunded_pwqc`.
 3. `rootHash` is the keccak256 of the root, and `wrapDigest` is the digest obtained by
    verifying the root over the leaves and the wrap chain over the root (§11.1, §11.3).
@@ -473,6 +477,16 @@ consistent with the published evidence, and an honest participant's own leaf sho
 evidence is the task's. A challenger therefore runs with the miner's node and checks the tasks
 that node worked on; it needs an L2 account funded for the bond, and without one it only
 reports what it would challenge.
+
+A receipt published before receipts listed payees has none; for such a task check 2 is
+skipped (the settlement's payouts came from the orchestrator's ledger and cannot be rebuilt).
+
+**Limitations.** The binding checked is the operator's active one when the challenger checks,
+not the one settle used: an operator that rotates or revokes its payout address between
+settle and the check makes check 2 fail on an honest settlement. Until the receipt carries
+each payee's binding, operators should not change their payout address while a task of
+theirs is in its window. Bindings registered before keys and signatures were published carry
+neither and must be registered again (with a higher nonce).
 
 Not checked here: whether each payee's amount follows the fee rules of
 [`economics.md`](economics.md) §§2–4, which needs the dispatch and quorum records of every

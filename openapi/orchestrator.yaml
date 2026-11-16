@@ -1396,7 +1396,9 @@ components:
           description: Operator Ed25519 public key (operator_id is its SHA-256)
         signature_b64:
           type: string
-          description: Signature over the wqc-payout-v1 message for this binding
+          description: >-
+            Signature over the binding's latest wqc-payout-v1 message (register for an
+            active binding, revoke for a revoked one)
 
     SettleRequest:
       type: object
