@@ -421,8 +421,9 @@ the accepted results and the wrap proof recomputes it.
 
 The wrap chain and the SNARK export are in `wqc-sv-stark` (`wrap`, `snark`); the circuit in
 `wqc-snark-wrap` (`wrapv2`) has 24,718,556 R1CS (test-only setup on 8 vCPU / 64 GB: setup
-52 m, prove 2 m 39 s); SettlementV4 and `WrapV2Verifier` are in `wqc-contracts`
-(`finalizeWithProof` 393,521 gas). The keys are a test-only setup, not a ceremony.
+1 h 12 m, prove 3 m 47 s, peak 40.3 GiB); SettlementV4 and `WrapV2Verifier` are in
+`wqc-contracts` (`finalizeWithProof` 393,521 gas as measured in the contract test: the call
+alone, with one payout). The keys are a test-only setup, not a ceremony.
 
 With `WQC_SETTLE_VALIDITY_PROOF=true` and `WQC_SETTLE_PROOF_ABI=v4` (and
 `WQC_SETTLEMENT_CONTRACT` pointing at SettlementV4) the pipeline runs end to end in code: the
@@ -432,7 +433,8 @@ it at settle; the wrap worker (`WQC_WRAP_PROVE_MODE=v2`) proves the witness for 
 finalize checks the proof is for it. The worker's `WQC_WRAP_KEYS_DIR` holds the output of
 `cmd/wrapv2-keys -write-pk` (`circuit.json.gz`, `pk.bin` as a gnark dump, `vk.bin`); it
 compiles the circuit and loads the keys before serving (about 3 m on the machine above, peak
-34.5 GiB with a proof).
+34.5 GiB with a proof). A gnark dump is the in-memory layout, so `pk.bin` must be read by the
+same gnark / gnark-crypto versions and CPU architecture that wrote it.
 
 Tasks without a wrap digest (v1 tasks, v2 roots over more than four leaves, roots whose wrap
 the composer could not prove) are not settled on chain in that mode. SettlementV4 has no
@@ -441,7 +443,8 @@ timeout refund, so an escrow locked for such a task stays locked.
 A devnet rehearsal (Anvil, SettlementV4 and WrapV2Verifier from a fresh test-only setup) ran
 a two-qubit `sample_counts` task with an ERC-2612 escrow from submit to `Finalized` in
 5 m 34 s: settle after 1 m 44 s, the v2 proof in 3 m 40 s on an 8 vCPU / 64 GB host,
-`finalizeWithProof` 489,979 gas as a transaction. No public network runs it yet.
+`finalizeWithProof` 489,979 gas as a transaction (with the transaction's base and calldata
+cost, and a payout to each operator that ran the task). No public network runs it yet.
 
 ---
 
