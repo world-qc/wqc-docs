@@ -478,8 +478,9 @@ evidence is the task's. A challenger therefore runs with the miner's node and ch
 that node worked on; it needs an L2 account funded for the bond, and without one it only
 reports what it would challenge.
 
-A receipt published before receipts listed payees has none; for such a task check 2 is
-skipped (the settlement's payouts came from the orchestrator's ledger and cannot be rebuilt).
+A receipt published before receipts listed payees has none; for such a task check 2 and the
+payee half of check 4 are skipped (the settlement's payouts came from the orchestrator's
+ledger and cannot be rebuilt).
 
 **Limitations.** The binding checked is the operator's active one when the challenger checks,
 not the one settle used: an operator that rotates or revokes its payout address between
