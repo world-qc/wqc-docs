@@ -345,7 +345,9 @@ Goldilocks² (Poseidon2 width 8):
    statement and its relation.
 2. **Normalizing layers.** Two recursion layers over the digest layer, at the recursion FRI
    parameters (rate 1/8, 28 queries, 16-bit query PoW). After them every proof has one shape
-   (measured for every tier with 1 to 4 leaves). A root whose proofs do not reach that shape is
+   (measured for every tier with 1 to 4 leaves, and with 64 leaves at `normal`, `high` and
+   `ultra`; the orchestrator still wraps roots of at most four leaves, since verifying a
+   64-leaf root takes minutes). A root whose proofs do not reach that shape is
    refused by the prover and the verifier alike (fail-closed): it cannot be wrapped.
 3. **Stages.** The first stage runs over the root: $D_1$ binds the root's statement and the
    root's preprocessed commitment. The second runs over the first stage's last proof: its
