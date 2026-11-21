@@ -459,9 +459,13 @@ A task is a **v2 task** when all of these hold at submission:
   CNOT, CZ and the like alone has none) and `W` (gate rows: rounding steps ×
   2^(n−1), from `libwqc_stark_verifier`'s `wqc_sv_leaf_rows`) at most 2^22, or
   it is a terminal circuit over that limit (or over the scalar and expectation
-  cap) whose tail fits it: the orchestrator cuts it at the earliest gate whose
-  tail does, within the last 2^13 gates (`wqc_sv_tail_cut`), and the sub-task
-  proves only that tail
+  cap) whose tail fits it: the orchestrator cuts it at the earliest gate,
+  within the last 2^13 gates, whose tail has at most `WQC_SV_TAIL_MAX_ROWS`
+  rows (2^20 by default, and never over the mode's own limit; `wqc_sv_tail_cut`),
+  and the sub-task proves only that tail. A smaller tail fits more nodes and
+  costs every verifier less; the head it lengthens is computed natively. The
+  work report of a tail counts the tail's gates, so the node is paid for the
+  leaf it proves, not for the head
   (`sv_segment`, [`zk-STARK.md`](zk-STARK.md) §6.7). A
   circuit with mid-circuit semantics ([`circuit-payload.md`](circuit-payload.md)
   §2.1) has one when its rewritten form does ([`zk-STARK.md`](zk-STARK.md) §6.5):
@@ -485,7 +489,8 @@ a node takes.
 The orchestrator builds the leaf's verifier before it dispatches, one build at a
 time, and caches it per circuit, shots, classical bits, tier, and cut. A tail's
 verifier also computes the state the head reaches. A build blocks
-that dispatch (up to about 16 s at `W` = 2^22). Before it builds, it checks that
+that dispatch (up to about 16 s at `W` = 2^22; a tail's build adds the head's
+run, about 30 ns per head gate row, so tens of seconds for the longest heads). Before it builds, it checks that
 verifying the task's root (`wqc_sv_root_peak_bytes`, [`zk-STARK.md`](zk-STARK.md)
 §8.5) and building the verifier (`wqc_sv_verifier_peak_bytes`) fit the memory
 it can spare; when they do not, the sub-task stays queued and is tried again
@@ -505,7 +510,8 @@ The orchestrator's `WQC_SV_STARK_V2_DISPATCH` (on by default) turns v2 tasks
 off: with it off, or under validity-proof settlement (a v2 root has no SNARK
 wrap yet), every task is v1 and bit 5 is never required. Its
 `WQC_SV_SEGMENTS` (on by default) turns tails off: a circuit too deep for one
-leaf then stays v1 and bit 8 is never required. The orchestrator
+leaf then stays v1 and bit 8 is never required. `WQC_SV_TAIL_MAX_ROWS` caps
+a tail's `W`. The orchestrator
 verifies v2 results whenever they arrive.
 
 ## 7. Result
