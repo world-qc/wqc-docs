@@ -3,7 +3,7 @@
 - **Status:** Working spec — payload contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-08-29
-- **Verified against:** `wqc-orchestrator@9f539f6` `wqc-core@f162911` `wqc-node@2718da4`
+- **Verified against:** `wqc-orchestrator@c075f0c` `wqc-core@447c795` on `feature/request-size` (§5 body limits). Prior snapshot: `wqc-orchestrator@9f539f6` `wqc-core@f162911` `wqc-node@2718da4`
 - **Audience:** Client developers, and implementers of the submit / dispatch / compute path
 - **Related:** `wqc-orchestrator/openapi/openapi.yaml`, `wqc-core/openapi/openapi.yaml`, `wqc-core/doc/trace-spec.md`, [`spec/zk-STARK.md`](zk-STARK.md), [`spec/OpenQASM.md`](OpenQASM.md)
 
@@ -165,9 +165,16 @@ why `noise_model` weakens the proof — see §6.
 | `classical_bit_count` | `1..=16` | Submit validation |
 | Mid-circuit `sample_counts` qubits | `<= 20` | Submit validation and core |
 | Measured qubits (compact register after slicing) | `<= 20` | Slice policy |
+| Submit request body | `<= 8 MiB` (`413` above) | Orchestrator, before any task or escrow |
+| Request body to wqc-core | `<= 16 MiB` (`413` above) | wqc-core; a dispatch adds the contraction tree and site order to the circuit |
 
-These come from probability-table enumeration and dense trajectory state, not from the
-STARK. Large sliced workloads should use `statevector_scalar`, which has no such cap.
+The bit and qubit limits come from probability-table enumeration and dense trajectory
+state, not from the STARK. Large sliced workloads should use `statevector_scalar`, which
+has no such cap.
+
+The body limits keep a circuit the orchestrator accepts within what every node's core
+reads. 8 MiB holds about 160,000 rotations (one with a 17-digit angle is about 50 bytes of
+JSON).
 
 ## 6. Optional noise model
 
