@@ -141,6 +141,15 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          description: |
+            Request body exceeds 8 MiB. Refused before any task or escrow.
+            wqc-core reads at most 16 MiB, and a dispatch adds the contraction
+            tree and site order to the circuit.
+          content:
+            text/plain:
+              schema:
+                type: string
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1195,32 +1204,9 @@ components:
         root_proof_url:
           type: string
           format: uri
-        wrap_evidence:
-          $ref: "#/components/schemas/WrapEvidence"
         error:
           type: string
           description: Present when `status` is `failed`
-
-    WrapEvidence:
-      type: object
-      description: >-
-        For a task wrapped for SettlementV4: what a challenger needs to recompute the wrap
-        digest (zk-SNARK.md §11.6). The URLs are presigned and may redirect to CAS.
-      required: [wrap_digest, root_url, wrap_url, leaves_url]
-      properties:
-        wrap_digest:
-          type: string
-          description: "`0x` + 64 hex, the digest committed at settle"
-        root_url:
-          type: string
-          format: uri
-        wrap_url:
-          type: string
-          format: uri
-        leaves_url:
-          type: string
-          format: uri
-          description: The leaves JSON the root and wrap chain were verified over
 
     P2PBootstrapResponse:
       type: object
@@ -1391,14 +1377,6 @@ components:
           type: integer
           format: int64
           description: Unix timestamp
-        operator_pubkey_b64:
-          type: string
-          description: Operator Ed25519 public key (operator_id is its SHA-256)
-        signature_b64:
-          type: string
-          description: >-
-            Signature over the binding's latest wqc-payout-v1 message (register for an
-            active binding, revoke for a revoked one)
 
     SettleRequest:
       type: object
