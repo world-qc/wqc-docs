@@ -460,7 +460,8 @@ A task is a **v2 task** when all of these hold at submission:
   2^(n−1), from `libwqc_stark_verifier`'s `wqc_sv_leaf_rows`) at most 2^22, or
   it is a terminal circuit over that limit (or over the scalar and expectation
   cap) whose tail fits it: the orchestrator cuts it at the earliest gate whose
-  tail does (`wqc_sv_tail_cut`), and the sub-task proves only that tail
+  tail does, within the last 2^13 gates (`wqc_sv_tail_cut`), and the sub-task
+  proves only that tail
   (`sv_segment`, [`zk-STARK.md`](zk-STARK.md) §6.7). A
   circuit with mid-circuit semantics ([`circuit-payload.md`](circuit-payload.md)
   §2.1) has one when its rewritten form does ([`zk-STARK.md`](zk-STARK.md) §6.5):
