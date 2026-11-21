@@ -490,7 +490,7 @@ The orchestrator builds the leaf's verifier before it dispatches, one build at a
 time, and caches it per circuit, shots, classical bits, tier, and cut. A tail's
 verifier also computes the state the head reaches. A build blocks
 that dispatch (up to about 16 s at `W` = 2^22; a tail's build adds the head's
-run, about 30 ns per head gate row, so tens of seconds for the longest heads). Before it builds, it checks that
+run, about 10–30 ns per head gate row in the memory of $2^n$ amplitudes, 14 s for the longest heads on an 8-core Mac). Before it builds, it checks that
 verifying the task's root (`wqc_sv_root_peak_bytes`, [`zk-STARK.md`](zk-STARK.md)
 §8.5) and building the verifier (`wqc_sv_verifier_peak_bytes`) fit the memory
 it can spare; when they do not, the sub-task stays queued and is tried again
