@@ -11,8 +11,8 @@ This document defines a **reference E2E stack** (logical services and URLs). Bri
 
 | Suite | Cases | Runtime (typical) | What it proves |
 | --- | --- | --- | --- |
-| `TIER=fast` | 10 | ~30–60 s | Scalar, counts, expectation, multislice, Phase C mid-circuit / noise, TN cut, X/Y basis |
-| `TIER=all` | 11 | + slow OP1 | Adds `multislice_28q_zz` (28q ZZ expectation, minutes) |
+| `TIER=fast` | 12 | ~30–60 s | Scalar, counts, expectation, multislice, Phase C mid-circuit / noise, TN cut, X/Y basis, unmeasured / unobserved wires |
+| `TIER=all` | 13 | + slow OP1 | Adds `multislice_28q_zz` (28q ZZ expectation, minutes) |
 | Signoff drills | E2E + 5 recovery/fault scripts | varies | §6-style rehearsal: restart, quorum stall, memory budget |
 
 **In scope:** Redis client billing, swarm bid/quorum, leaf STARK, remote **wqc-composer** root seal, economics receipt on Redis/CAS. Matches public testnet’s off-chain SoT (DNS/TLS/faucet UI aside).
@@ -240,7 +240,7 @@ Phase C meta (optional): `measurement_spec_hash`, `noise_model` in orchestrator 
 
 | Tier | Cases |
 | --- | --- |
-| `fast` (10) | scalar, bell counts, expectation, multislice 4q, mid-circuit IF, multislice mid-circuit IF, noise, tn_cut 28q, x_basis, y_basis |
+| `fast` (12) | scalar, bell counts, expectation, multislice 4q, mid-circuit IF, multislice mid-circuit IF, noise, tn_cut 28q, x_basis, y_basis, unmeasured control, unobserved CZ |
 | `slow` | `multislice_28q_zz` (OP1, ~minutes) |
 
 See [`circuits/README.md`](circuits/README.md) for file layout and shot conventions (`512` for regression counts, `1024` for deterministic X/Y basis).
@@ -252,10 +252,10 @@ From **`wqc-docs` repository root**:
 ```bash
 export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
 
-# Fast tier (10 cases + manifest golden checks)
+# Fast tier (12 cases + manifest golden checks)
 TIER=fast ./examples/e2e/run_e2e.sh
 
-# Full suite including slow 28q expectation (11 cases)
+# Full suite including slow 28q expectation (13 cases)
 TIER=all ./examples/e2e/run_e2e.sh
 ```
 
@@ -296,7 +296,7 @@ SKIP_SLOW=1 ./run_signoff.sh     # fast + drills only (does not close full §6 c
 
 | Step | Script | What it proves |
 | --- | --- | --- |
-| 1 | `01_e2e_fast.sh` | Fast tier (10 cases) + manifest asserts |
+| 1 | `01_e2e_fast.sh` | Fast tier (12 cases) + manifest asserts |
 | 2 | `02_e2e_all.sh` | Full suite incl. slow `multislice_28q_zz` |
 | 3 | `03_node_restart.sh` | Node pending / outbox survive restart |
 | 4 | `04_orch_restart.sh` | Orchestrator restart → health + bootstrap + task progress |
@@ -347,7 +347,7 @@ Record results in [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) (from [`RESUL
 1. **Missing `client_id`** → submit 400 when billing enabled.
 2. **Presigned manifest URL** uses in-cluster DNS — rewrite hostname or fetch via object-store admin.
 3. **Orchestrator hot-reload** may leave an old binary after compile errors — verify TN cut log or restart orchestrator.
-4. **28q scalar** produces **4 slices** — allow ~180 s timeout in manifest.
+4. **28q scalar** produces **4 slices** on v1 and one v2 leaf with v2 on — allow ~180 s timeout in manifest.
 5. **No composer** → tasks stall in `composing_proofs` (orch has no in-process compose).
 
 ## 9. Last verified
@@ -357,8 +357,8 @@ Update this section when re-running against your reference stack.
 | Field | Value |
 | --- | --- |
 | Date | 2026-09-21 |
-| `TIER=fast` | 10/10 `completed` + manifest assertions (incl. mid-circuit IF) |
-| `TIER=all` | 11/11 incl. slow `multislice_28q_zz` |
+| `TIER=fast` | 12/12 `completed` + manifest assertions (incl. mid-circuit IF) |
+| `TIER=all` | 13/13 incl. slow `multislice_28q_zz` |
 | Signoff | [`e2e/signoff/RESULT.md`](e2e/signoff/RESULT.md) — drills PASS (logs `/tmp/wqc-signoff-20260921-153528`) |
 | Core image | `sha256:0df2d6f9ac09fd9e3209b7abd08ee75fb923f4c9795a3899a35fabfd746afb1b` |
 | Composer | `wqc-composer-01` healthy (`9101`) — required for root seal |

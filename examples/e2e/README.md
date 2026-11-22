@@ -24,12 +24,14 @@ Curated **runners** for regression against a reference WQC stack. Submit payload
 | `mid_circuit_if_measure` | `sample_counts` | Phase C IF + mid-circuit MEASURE |
 | `multislice_4q_mid_circuit_if` | `sample_counts` | C2c MP1 idle wires + mid-circuit IF (trajectory zk) |
 | `noise_depolarizing_counts` | `sample_counts` | Phase C `noise_model` meta |
-| `tn_cut_scalar_28q` | `statevector_scalar` | 28q → 4 slices; TN cut picks idle wires |
+| `tn_cut_scalar_28q` | `statevector_scalar` | 28q → 4 slices on v1 (TN cut picks idle wires), one v2 leaf with v2 on; amplitude ≈1 |
 | `x_basis_sample_counts` | `sample_counts` | X-basis → `{"0":1024}` |
 | `y_basis_sample_counts` | `sample_counts` | Y-basis → `{"0":1024}` |
+| `sample_unmeasured_control` | `sample_counts` | MP1 — unmeasured q0 controls q1 → `{"1":1024}`; q0 is not fixed |
+| `expectation_unobserved_cz` | `expectation` | OP1 — Bell via CZ, ⟨Z1⟩≈0, ⟨ZZ⟩≈1; q0 is not fixed |
 | `multislice_28q_zz` | `expectation` | OP1 — 28q ZZ (slow tier) |
 
-Fast tier: **10** cases. `TIER=all` adds the slow OP1 case.
+Fast tier: **12** cases. `TIER=all` adds the slow OP1 case.
 
 ## Quick run
 
