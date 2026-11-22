@@ -314,9 +314,10 @@ paths:
       description: |
         `gate_count` of `0` is treated as `1`. Unknown `security_level`
         is coerced to `normal`. Empty `output_mode` is `statevector_scalar`
-        (MPS quote width stand-in 2048). When `circuit` is present, scalar
-        slice estimates follow the MPS cutwidth / time-split walk; a walk
-        that hits the work ceiling returns 400.
+        (MPS quote width stand-in 2048). Every task is quoted as one slice:
+        slicing fixes only wires no gate touches. When `circuit` is present,
+        a scalar that no exact tree, MPS leaf or time split can run returns
+        400.
       operationId: postEconomyQuote
       requestBody:
         required: true
@@ -1268,14 +1269,14 @@ components:
           type: string
           description: |
             Empty or `statevector_scalar` uses the MPS scalar estimate
-            (stand-in width 2048). `sample_counts` and `expectation` keep
-            the dense compact-register envelope (target 26).
+            (stand-in width 2048). `sample_counts` and `expectation` are
+            priced as one slice at the dense compact width (at most 26).
         circuit:
           type: array
           description: |
-            Optional gate list (same shape as submit). Used for scalar MPS
-            cutwidth / time-split slice estimates when `output_mode` is
-            scalar. Omitted → `2^(qubits - 2048)` stand-in for scalars.
+            Optional gate list (same shape as submit). For a scalar it picks
+            the exact tree or the MPS leaf and finds a circuit that cannot
+            run as one leaf. Omitted → one slice at the 2048-qubit stand-in.
           items:
             type: object
             additionalProperties: true
