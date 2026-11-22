@@ -3,7 +3,7 @@
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@a239af8` on `feature/sv-idle-wires` (a task over 16 qubits that touches at most 16 is one v2 leaf on those wires). Prior snapshot: `wqc-orchestrator@b8571ac` `wqc-node@6cf181e` `wqc-core@403498e` `wqc-stark-engine@f4601dd` on main (bit 8, core `sv_segments`, dispatch `sv_segment`, `WQC_SV_SEGMENTS`). Prior snapshot: `wqc-orchestrator@7ade3c5` `wqc-node@bf7efba` `wqc-core@f72fce2` `wqc-stark-engine@8d7ba09` on `feature/sv-stark-scalar` (bit 7, core `sv_state_outputs`, `proof.sv_state_b64`, `WQC_SV_STATE_OUTPUTS_MAX_ROWS`). Prior snapshot: `wqc-orchestrator@81df70a` `wqc-node@ed2449e` `wqc-core@4628973` `wqc-stark-engine@96b47aa` on `feature/sv-stark-dynamic` (bit 6, core `sv_dynamic`, mid-circuit circuits rewritten by `wire::parse_leaf`); `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf); `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified against:** `wqc-orchestrator@30be33b` `wqc-node@a9364b3` `wqc-core@5100b33` `wqc-stark-engine@23c31e3` on `feature/sv-wide-leaves` (bit 9, core `sv_max_qubits`, `W_eff`, `wqc_sv_leaf_qubits`, `WQC_SV_WIDE_LEAVES`). Prior snapshot: `wqc-orchestrator@a239af8` on `feature/sv-idle-wires` (a task over 16 qubits that touches at most 16 is one v2 leaf on those wires). Prior snapshot: `wqc-orchestrator@b8571ac` `wqc-node@6cf181e` `wqc-core@403498e` `wqc-stark-engine@f4601dd` on main (bit 8, core `sv_segments`, dispatch `sv_segment`, `WQC_SV_SEGMENTS`). Prior snapshot: `wqc-orchestrator@7ade3c5` `wqc-node@bf7efba` `wqc-core@f72fce2` `wqc-stark-engine@8d7ba09` on `feature/sv-stark-scalar` (bit 7, core `sv_state_outputs`, `proof.sv_state_b64`, `WQC_SV_STATE_OUTPUTS_MAX_ROWS`). Prior snapshot: `wqc-orchestrator@81df70a` `wqc-node@ed2449e` `wqc-core@4628973` `wqc-stark-engine@96b47aa` on `feature/sv-stark-dynamic` (bit 6, core `sv_dynamic`, mid-circuit circuits rewritten by `wire::parse_leaf`); `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf); `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -330,6 +330,7 @@ bids only if it expects to finish in time ([`work-budget.md`](work-budget.md)).
 | `1 << 6` | sv-stark v2 mid-circuit leaf | — (set with bit 5 when core `GET /sysinfo` also reports `sv_dynamic: true`) | the v2 task's circuit has mid-circuit semantics (§6.1): every bidder must prove its rewritten leaf |
 | `1 << 7` | sv-stark v2 state outputs | — (set with bit 5 when core `GET /sysinfo` also reports `sv_state_outputs: true`) | the v2 task is `statevector_scalar` or `expectation` (§6.1): every bidder must prove its unitary leaf and publish the final state (§7) |
 | `1 << 8` | sv-stark v2 segments | — (set with bit 5 when core `GET /sysinfo` also reports `sv_segments: true`) | the v2 task's circuit is too deep for one leaf and only its tail is proved (§6.1): every bidder must prove a segment leaf from the state the head reaches |
+| `1 << 9` | sv-stark v2 wide leaves | — (set with bit 5 when core `GET /sysinfo` also reports `sv_max_qubits` of 20 or more) | the v2 task's leaf has 17 to 20 qubits, ancillas included (§6.1): every bidder must prove it, budgeting its basis states |
 
 Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
 
@@ -383,7 +384,9 @@ The reference node takes the smaller of two bounds, both from core
 small leaf (n = 12, 8 rounding steps, 1024 shots), and reports
 `sv_bytes_per_row` and `sv_base_bytes`, `sv_dynamic: true` when it also proves
 mid-circuit circuits (bit 6), and `sv_state_outputs: true` when it also proves
-`statevector_scalar` and `expectation` tasks with a published state (bit 7):
+`statevector_scalar` and `expectation` tasks with a published state (bit 7),
+`sv_segments: true` when it proves tails (bit 8), and `sv_max_qubits`, the most
+qubits a leaf of it may have (bit 9 when 20 or more):
 
 - Memory: `sv_base_bytes + sv_bytes_per_row · W` fits 80% of the node's RAM
   budget.
@@ -470,13 +473,23 @@ A task is a **v2 task** when all of these hold at submission:
   circuit with mid-circuit semantics ([`circuit-payload.md`](circuit-payload.md)
   §2.1) has one when its rewritten form does ([`zk-STARK.md`](zk-STARK.md) §6.5):
   every IF holds a one-qubit gate, CNOT or CZ (not CCNOT), and the register plus
-  one ancilla per RESET of a used qubit is at most 16 qubits; `n` in `W` counts
+  one ancilla per RESET of a used qubit fits the leaf's qubits; `n` in `W` counts
   the ancillas.
+- The leaf has at most 16 qubits, ancillas included, or at most 20 when the
+  orchestrator dispatches wide leaves (`WQC_SV_WIDE_LEAVES`, off by default).
+  Above 16 qubits a leaf's `2^n` basis states weigh in a prover's memory as much
+  as its gate rows do ([`zk-STARK.md`](zk-STARK.md) §6.4), so the leaf is
+  budgeted as its effective rows `W_eff = W + 3 · (2^n − 2^16)` (`W` up to 16
+  qubits; `wqc_sv_effective_rows`, with `n` from `wqc_sv_leaf_qubits`): a node
+  covers it when `sv_max_rows ≥ W_eff`, and the timeout below takes `W_eff` for
+  `W`. A node refuses a dispatch whose `W_eff` is over its `sv_max_rows`, or
+  whose leaf has over 16 qubits when it does not set bit 9. The dispatch carries
+  `W` itself in `sv_leaf_rows`, since core checks it against the circuit.
 
 A v2 task is proved as a v2 leaf and nothing else. Its announcement sets bit 5
 in `required_features`, bit 6 too when its circuit has mid-circuit semantics,
-bit 7 when it is `statevector_scalar` or `expectation`, and bit 8 when only its
-tail is proved, so only nodes that prove such leaves bid. A v2 task carries no contraction tree, MPS time split or
+bit 7 when it is `statevector_scalar` or `expectation`, bit 8 when only its
+tail is proved, and bit 9 when its leaf has over 16 qubits, so only nodes that prove such leaves bid. A v2 task carries no contraction tree, MPS time split or
 site order, and announces no tree work. With no such bidder the task gets no bids and fails at bid collection, as any task whose required features no node has; an orchestrator built with mid-circuit leaves therefore needs nodes that set bit 6 before it takes such tasks. The
 announcement does not carry `W`; at dispatch the orchestrator takes a quorum
 group from the bidders with `sv_max_rows ≥ W` and waits for idle ones when
@@ -484,9 +497,9 @@ there are too few. When no bidder at all, busy or idle, has `sv_max_rows ≥ W`,
 waiting cannot help: the task fails with that reason and its escrow is refunded.
 A v2 task is never sliced: it is one sub-task over the whole register, whatever
 the bidders' `max_qubit_capability`, since `sv_max_rows` already bounds the leaf
-a node takes. The one exception is a task declared over 16 qubits whose gates
-(an `IF`'s gate included), `MEASURE`s and observable terms touch at most 16
-wires. The other wires stay `|0⟩`, so the orchestrator drops them, as slices
+a node takes. The one exception is a task declared wider than a leaf may be
+(above) whose gates (an `IF`'s gate included), `MEASURE`s and observable terms
+touch few enough wires. The other wires stay `|0⟩`, so the orchestrator drops them, as slices
 fixing them at 0 would, and the counts, the `|0…0⟩` amplitude and the
 observables' values do not change. That sub-task is the leaf on the remaining
 wires, in their order: it is dispatched with no slice assignments, the pruned
@@ -508,10 +521,10 @@ it is built again; if that build fails for lack of memory, the result is
 rejected and the sub-task is redispatched without a slash.
 
 Every other task goes out as v1 leaves. Traps stay v1 on every task. A recovery
-dispatch of a v2 sub-task goes only to a node with bit 5 (and bit 8 for a tail)
-and `sv_max_rows ≥ W`.
+dispatch of a v2 sub-task goes only to a node with bit 5 (and bit 8 for a tail,
+bit 9 for a leaf over 16 qubits) and `sv_max_rows ≥ W_eff`.
 
-The timeout of a v2 leaf is `90 s + 50 µs × W`, with no tier multiplier, capped
+The timeout of a v2 leaf is `90 s + 50 µs × W_eff`, with no tier multiplier, capped
 like every sub-task (330 s by default).
 
 The orchestrator's `WQC_SV_STARK_V2_DISPATCH` (on by default) turns v2 tasks
@@ -519,7 +532,9 @@ off: with it off, or under validity-proof settlement (a v2 root has no SNARK
 wrap yet), every task is v1 and bit 5 is never required. Its
 `WQC_SV_SEGMENTS` (on by default) turns tails off: a circuit too deep for one
 leaf then stays v1 and bit 8 is never required. `WQC_SV_TAIL_MAX_ROWS` caps
-a tail's `W`. The orchestrator
+a tail's `W`. `WQC_SV_WIDE_LEAVES` (off by default) allows leaves of 17 to 20
+qubits; such a task requires bit 9 and fails at bid collection when no node sets
+it, so it is turned on only where such nodes run. The orchestrator
 verifies v2 results whenever they arrive.
 
 ## 7. Result
