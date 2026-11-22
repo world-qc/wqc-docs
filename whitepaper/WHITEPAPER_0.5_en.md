@@ -189,8 +189,8 @@ Rather than forcibly stuffing these into a single data format, WQC provides thre
 
 Tensor network slicing is a powerful technique for parallelizing computation. However, indiscriminately fixing the qubit axes targeted by measurement destroys the quantum-mechanical superposition (coherence) of the measurement results, preventing correct sampling or expectation values. To resolve this trade-off, WQC imposes constraints on slice axis selection per output mode.
 
-* **Measurement-preserving slicing**: In sampling mode, qubit axes subject to terminal measurement (`MEASURE`) are automatically excluded from slice partitioning. Only non-measured qubits are compactly sliced, so contraction executes while preserving the measured quantum state in full, subject to Worker node memory constraints.
-* **Observable-preserving slicing**: In expectation mode, fixing qubit axes on which the requested Pauli operators ($X, Y, Z$) act non-trivially is prohibited. This enables efficient parallel dispatch for circuits exceeding 28 qubits by extracting only the relevant qubit neighborhood.
+* **Measurement-preserving slicing**: In sampling mode, qubit axes subject to terminal measurement (`MEASURE`) are never sliced. Neither is any axis a gate acts on: fixing such an axis mid-circuit would drop its gates and the other branch of its superposition. Only idle axes are fixed. Each stays $|0\rangle$, so its single branch is the whole answer, and contraction runs on the measured state in full. A task whose remaining axes exceed Worker node memory is rejected, not approximated.
+* **Observable-preserving slicing**: In expectation mode, the same rule keeps every axis on which the requested Pauli operators ($X, Y, Z$) act non-trivially and every axis a gate acts on. A wide circuit that touches only a few qubits is dispatched on that neighborhood alone. This allows circuits declared above 28 qubits.
 
 #### 3.4.3 Trajectory Separation for Dynamic Quantum Circuits (Mid-Circuit Measurement)
 

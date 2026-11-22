@@ -31,7 +31,7 @@ docker compose -f examples/compose.yml up -d
 export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
 export COMPOSE_DIR="${COMPOSE_DIR:-$PWD/examples}"
 
-# fast suite (~30s) — 10 cases + golden manifest checks
+# fast suite (~30s) — 12 cases + golden manifest checks
 TIER=fast ./examples/e2e/run_e2e.sh
 
 # include 28q OP1 expectation (~5 min)

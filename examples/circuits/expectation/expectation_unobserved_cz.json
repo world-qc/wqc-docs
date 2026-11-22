@@ -1,0 +1,22 @@
+{
+  "client_id": "client-01",
+  "qubit_count": 2,
+  "security_level": "low",
+  "output_mode": "expectation",
+  "circuit": [
+    { "type": "H", "params": [0] },
+    { "type": "H", "params": [1] },
+    { "type": "CZ", "params": [0, 1] },
+    { "type": "H", "params": [1] }
+  ],
+  "observables": [
+    {
+      "id": "Z1",
+      "terms": [{ "label": "ZI", "coeff": { "real": 1.0, "imag": 0.0 } }]
+    },
+    {
+      "id": "ZZ",
+      "terms": [{ "label": "ZZ", "coeff": { "real": 1.0, "imag": 0.0 } }]
+    }
+  ]
+}

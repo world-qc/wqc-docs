@@ -5,8 +5,8 @@ All curated submit payloads live here. The E2E registry (`../e2e/manifest.tsv`) 
 | Dir | Mode / focus | Files |
 |-----|----------------|-------|
 | [`scalar/`](scalar/) | `statevector_scalar` | `scalar_h2_amplitude`, `tn_cut_scalar_28q` |
-| [`sample/`](sample/) | `sample_counts` (terminal) | Bell, X/Y basis |
-| [`expectation/`](expectation/) | `expectation` | `expectation_xz`, `multislice_28q_zz` (OP1, slow) |
+| [`sample/`](sample/) | `sample_counts` (terminal) | Bell, X/Y basis, `sample_unmeasured_control` |
+| [`expectation/`](expectation/) | `expectation` | `expectation_xz`, `expectation_unobserved_cz`, `multislice_28q_zz` (OP1, slow) |
 | [`multislice/`](multislice/) | MP1 idle-wire sample | `multislice_4q_counts` |
 | [`mid_circuit/`](mid_circuit/) | Phase C1 / C2c IF + MEASURE | mid-circuit IF (± multislice) |
 | [`noise/`](noise/) | Phase C3 noise_model | `noise_depolarizing_counts` |
