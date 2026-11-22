@@ -50,11 +50,10 @@ built from a different circuit and does not receive the parent's tree.
 |---------|--------|
 | Quote with no circuit | No tree. Submit rejects an empty circuit. The 2048-qubit MPS stand-in in [`mps-scalar.md`](mps-scalar.md) §4 |
 | Non-empty, plan fits | One slice. `estimated_slices = 1`. Not saturated |
-| Non-empty, plan returns no tree | No tree. Cutwidth branch or time split, including their ceilings |
+| Non-empty, plan returns no tree | No tree. One MPS slice, idle wires fixed, or a time split; otherwise rejected ([`mps-scalar.md`](mps-scalar.md) §4) |
 | `expectation`, `sample_counts` | No tree, in either case |
 
-A fitting tree is one slice even when the cutwidth walk would hit `2^30` or the
-4096-node cap. The gate cap (100000) and the qubit cap (4096) still return no
+A fitting tree is one slice even when the MPS estimate would reject the circuit. The gate cap (100000) and the qubit cap (4096) still return no
 tree, and the estimate then saturates as in [`mps-scalar.md`](mps-scalar.md) §4.
 Submit rejects that saturation before locking quorum. `Start` still returns
 false on it, and submit then calls `abortTask`.
@@ -85,17 +84,17 @@ Examples, nearest neighbour unless noted. Peaks are `peak_bytes`.
 | Circuit | State tree | Network tree | Attached | Quote |
 |---------|-----------:|-------------:|----------|-------|
 | 16q depth-8 RY+CNOT brickwork | 1310784 | 22528 | network | 1 slice, `VRAM_MiB` 1 |
-| 20q all-to-all CNOT clique | 25165856 | 1277952 | network | 1 slice. The cutwidth walk of the same circuit remains 32 |
+| 20q all-to-all CNOT clique | 25165856 | 1277952 | network | 1 slice. Without the tree it is rejected (cut width over χ, every wire touched) |
 | 50q depth-8 RY+CNOT brickwork | does not fit | 95488 | network | 1 slice |
 | 50q depth-16 RY+CNOT brickwork | does not fit | 17367040 | network | 1 slice. Without the tree it would time-split at boundary bond 16 |
 | 50q, one `H` on each wire | 1600 | 1696 | state | 1 slice |
-| 1D 30q depth-32 RY+RZ+CNOT brickwork | does not fit | 8388736, split | network | 1 slice. The cutwidth walk would take 256 |
+| 1D 30q depth-32 RY+RZ+CNOT brickwork | does not fit | 8388736, split | network | 1 slice. Without the tree it is rejected |
 | 1D 100q depth-32 RY+RZ+CNOT brickwork | does not fit | 8388736, split | network | 1 slice |
-| 2D 8×8 depth-12 RY+RZ+CNOT grid | does not fit | does not fit | none | the cutwidth walk (saturates at `2^30`) |
+| 2D 8×8 depth-12 RY+RZ+CNOT grid | does not fit | does not fit | none | rejected (`2^30`) |
 
 Wherever a time split fits (boundary bond at most χ=128), a network tree has
-fitted in every circuit measured so far, so the time split and the cutwidth
-walk are now the path for circuits no tree can hold.
+fitted in every circuit measured so far. For circuits no tree can hold, the
+time split is the only MPS path, and a circuit with neither is rejected.
 
 ## 2. IR
 

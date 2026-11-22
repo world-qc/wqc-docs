@@ -161,7 +161,7 @@ economics receipt is published.
    // sample_counts / expectation: compact-register BFS upper bound (target 26)
    // statevector_scalar with a fitting exact tree: estimated_slices = 1,
    //   VRAM_MiB = ceil(peak_bytes / 2^20) (contraction-tree.md)
-   // otherwise: MPS stand-in width 2048; with a circuit, the cutwidth / time-split walk
+   // otherwise: MPS stand-in width 2048; with a circuit, one MPS leaf or a time split, else rejected
    estimated_slices = max(1, 2^(qubits - target_width))   // no-circuit stand-in
    fri_bps          = tier table                // low 5000, normal 10000, high 20000, ultra 25000
    TotalFee         = Gas × BaseFee × 10^9 × fri_bps / 10000

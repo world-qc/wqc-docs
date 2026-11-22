@@ -36,7 +36,7 @@ circuit there can carry a tree. No dispatch carries an empty mode: a trap
 sub-task copies the parent's mode. A trap is still built from a different
 circuit, so it does not carry the parent's tree. The sections below are the
 no-tree scalar. Expectation and sample slicing keep the dense compact width, and
-keep branching down to the 20-qubit limit.
+fix only wires no gate touches, as the scalar does (§4).
 
 ## 2. Memory and bond dimension
 
@@ -78,7 +78,7 @@ dimensions.
 ## 4. Scheduling a scalar parent
 
 A non-empty scalar whose greedy exact tree fits is one slice and is not branched,
-including when the walk below would hit a ceiling
+including when the estimate below would reject it
 ([`contraction-tree.md`](contraction-tree.md)). This section is the schedule when
 that plan returns no tree, and when the circuit is empty.
 
@@ -88,31 +88,34 @@ A scalar slice is dispatched as one slice when both hold:
    `max_mps_qubits`, §2); and
 2. its cut width is at most `χ`, or a time split fits (§5).
 
-Otherwise the orchestrator branches by fixing one qubit (two child slices, `e_<k> ∈ {0,1}`):
+Otherwise the orchestrator may fix only wires that no gate touches, each with its `0`
+branch (`e_<k> = 0`, one child slice). Such a wire stays `|0⟩`, so that one leaf is the
+whole amplitude `⟨0…0|ψ⟩`; its `1` branch would be zero. A wire a gate touches is never
+fixed. Pruning drops the gates on a fixed wire, and core does not use the fixed value
+(it only binds it into the public inputs), so fixing a touched wire, or sending its `1`
+branch, returns a wrong amplitude.
 
-- **Bond stop.** While the cut width exceeds `χ`, the branch qubit is chosen on the smaller
-  side of the widest cut.
-- **Memory stop.** When only memory is short, the lowest free wire is fixed. No min-cut is
-  run.
-- **Time split before a bond stop.** When the cut width exceeds `χ` and no qubit is fixed
-  yet, the orchestrator tries a time split (§5). If a plan exists, the parent is one slice;
-  otherwise it branches as above.
+- **Memory.** While the compact width exceeds the pool width, the lowest idle wire is
+  fixed. When no idle wire is left, the task fails (`no branchable qubit`).
+- **Bond.** When the cut width exceeds `χ` and no qubit is fixed yet, the orchestrator
+  tries a time split (§5). If a plan exists, the parent is one slice. Otherwise the task
+  fails: fixing an idle wire does not narrow a cut.
 
-Quote and submit estimate the slice count with the same rules:
+Every scalar task is therefore one leaf, or it is rejected. Quote and submit apply the
+same rules, so the scheduler fails only when the pool is narrower than the quote's
+stand-in width:
 
 | Case | Estimated slices |
 |------|------------------|
-| Cut width ≤ χ and compact width ≤ pool width | 1 |
-| Cut width ≤ χ, width above the pool width | `2^(q − pool width)` |
-| Cut width > χ and a time split fits (§5) | 1 |
-| Cut width > χ and no time split fits | 2 (and more as the walk continues) |
+| Wires a gate touches > pool width | rejected (`2^30`) |
+| Cut width ≤ χ | 1 |
+| Cut width > χ, register ≤ pool width, and a time split fits (§5) | 1 |
+| Cut width > χ otherwise | rejected (`2^30`) |
 
-The estimate is **rejected** (quote and submit) when any of these ceilings is reached:
+The estimate is also **rejected** (quote and submit) over these caps:
 
-| Ceiling | Value |
+| Cap | Value |
 |---------|-------|
-| Estimated slices | `2^30` |
-| Branch-walk nodes | 4096 |
 | Gates | 100000 |
 | Qubits | 4096 |
 
@@ -121,7 +124,7 @@ The estimate is **rejected** (quote and submit) when any of these ceilings is re
 the stand-in width for a scalar is 2048 qubits (one `χ = 128` MPS in 1 GiB). With a
 circuit whose exact tree fits, the estimate is one slice
 ([`contraction-tree.md`](contraction-tree.md)). Otherwise the estimate follows the
-table above. A walk that hits a ceiling returns HTTP
+table above. A rejected estimate returns HTTP
 400 ([`economics.md`](economics.md) §3.1).
 
 **Submit / Start.** Submit rejects a saturated scalar before locking quorum. If the
@@ -161,7 +164,7 @@ A split is planned (`TimeSplitPlan`) only when:
 
 - both halves' cut widths are at most the limit above;
 - the slice has no fixed qubits (the split index is into the **unpruned** gate list, so a
-  slice that already fixed a qubit stays on the width walk); and
+  slice that already fixed a qubit gets no split, and fails if its cut width is over χ); and
 - the circuit has at least two gates.
 
 **Planner (`TimeSplitPlan`).** Left cutwidth is non-decreasing and right cutwidth is
@@ -291,8 +294,9 @@ orchestrator's verifier accepts proofs up to 32 MiB.
 | `overlap segment failed AIR verification before prove` | The claimed amplitude does not match the claimed tensors | Core bug |
 | Orchestrator: `overlap tail required for mps_time_split subtask` | The node omitted the tail | Misbehaving or old node |
 | Older node rejects dispatch signature | `mps_time_split` set, or a contraction tree is attached, and the node does not know that suffix | Rollout order |
-| Quote / submit: work-ceiling rejection | Estimate hit `2^30` / walk / gate / qubit caps (§4) | Client or circuit too large |
+| Quote / submit: work-ceiling rejection | Estimate rejected (`2^30`), or over the gate / qubit caps (§4) | Client or circuit too large |
 | Task failed: `scalar slice estimate exceeded the work ceiling` | `Start` refused a saturated estimate | Same as above; escrow finalized |
+| Task failed: `no branchable qubit for scalar slice …`, or `the bond is over χ with no time split` | The pool is narrower than the quote's stand-in width, and no idle wire is left to fix, or the cut needs a split the slice cannot take (§4) | Pool too narrow for the circuit; escrow finalized |
 
 ## 9. Open gaps
 
