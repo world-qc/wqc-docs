@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — scalar tree contract (state tree and network tree)
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-07
-- **Verified against:** `wqc-core@4bf4f0d` on `feature/tn-absorb` (in-place absorb). Prior snapshot: `wqc-core@7c98af3` on `feature/tree-trace-bond` (trace sweep bond cap); `wqc-orchestrator@6d6dc15` `wqc-core@1fd4b1b` on `feature/bisection-order` (bisection candidate); `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
+- **Verified:** 2026-11-22
+- **Verified against:** `wqc-orchestrator@c306dfe` on `main` (no-tree scalar estimate is 1 or rejected). Prior snapshots: `wqc-core@4bf4f0d` on `feature/tn-absorb` (in-place absorb); `wqc-core@7c98af3` on `feature/tree-trace-bond` (trace sweep bond cap); `wqc-orchestrator@6d6dc15` `wqc-core@1fd4b1b` on `feature/bisection-order` (bisection candidate); `wqc-orchestrator@e7685ef` `wqc-node@881f684` `wqc-core@e3c02ab` on `feature/gate-split` (gate halves, sweeps, bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` `wqc-core@dd61e55` on `feature/network-contraction`; `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree`
 - **Audience:** Implementers of the scheduler, node, and core; reviewers of quorum, fees, and proof claims
 - **Related:** [`mps-scalar.md`](mps-scalar.md) (the path with no tree), [`economics.md`](economics.md) (fees), [`p2p-protocols.md`](p2p-protocols.md) (signed bytes), [`zk-STARK.md`](zk-STARK.md) (what the proof binds), [`architecture-current.md`](architecture-current.md) (who dispatches)
 
