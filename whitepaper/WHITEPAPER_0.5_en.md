@@ -2,7 +2,7 @@
 
 ### ~ A Decentralized Quantum Simulation Protocol to Shatter Centralized Hegemony ~
 
-v0.5 restates v0.4 and prices the client's `security_level` in $\text{Total Fee}$. The fee is multiplied by the outer FRI query count relative to `normal` (16 queries): `low` $0.5\times$, `normal` $1\times$, `high` $2\times$, `ultra` $2.5\times$. Slice decomposition, the proof pipeline, and the 20% burn are unchanged. Normative integers: [`economics.md`](../spec/economics.md) §2.
+v0.5 restates v0.4 and prices the client's `security_level` in $\text{Total Fee}$. The fee is multiplied by the outer FRI query count relative to `normal` (16 queries): `low` $0.5\times$, `normal` $1\times$, `high` $2\times$, `ultra` $2.5\times$. The proof pipeline and the 20% burn are unchanged. Slicing (§3.1) is unchanged as the target design; today every task runs as one leaf (§5.2.1). Normative integers: [`economics.md`](../spec/economics.md) §2.
 
 ---
 
@@ -84,6 +84,10 @@ By fixing a specific index $i$ (dimension $d$) and splitting the circuit, **slic
 $$T_{\text{global}} = \sum_{k=1}^{d} T_{\text{slice}}^{(k)}$$
 
 The greatest advantage of this mathematical decomposition is that **Worker Nodes require no real-time communication (synchronization)**. Each slice computes in parallel independently, enabling planetary-scale asynchronous grid computing unaffected by network latency.
+
+The sum is over amplitudes, so it holds as written for `statevector_scalar`. Counts and expectation values are quadratic in the amplitudes, so those modes restrict which axes may be fixed (§3.4.2).
+
+> **Implementation status.** Today every task runs as one leaf. The Orchestrator fixes only wires that no gate touches, each on its $|0\rangle$ branch, which is then the whole answer. A scalar runs as one exact contraction tree or one MPS leaf. A task that fits none of these fails instead of returning an approximate value. Splitting a task into several branches and summing them is not implemented yet.
 
 ### 3.2 Deterministic Proof of Useful Work (D-PoUW)
 
@@ -167,6 +171,8 @@ graph LR
 
 Through this compression pipeline, the validity of thousands or tens of thousands of node computations converges to a single root proof ($\pi_{\text{Root}}$).
 
+> **Implementation status.** The root accepts several leaves ([`zk-STARK.md`](../spec/zk-STARK.md) §8.5), but today each task yields one leaf (§3.1).
+
 Aggregation is designed in stages: starting from native leaf-level STARK verification, progressing to binary tree combination via Aggregation STARK that binds child proof digests, and ultimately reaching full in-circuit recursion. Off-chain verifiers (Orchestrator FFI, aggregators, clients) check $\pi_{\text{Root}}$ directly. For **on-chain** settlement, raw $\pi_{\text{Root}}$ remains too large for L2 gas at current profiles; Layer-2 therefore verifies a succinct **SNARK wrap** $\pi_{\text{snark}}$ of that root (§3.5), not the STARK blob itself. Exploiting mathematical asymmetry—heavy generation, instant verification—WQC gains overwhelming scalability.
 
 ### 3.4 Execution Model: Practical Quantum Algorithms and Deterministic Sampling
@@ -187,7 +193,7 @@ Rather than forcibly stuffing these into a single data format, WQC provides thre
 
 #### 3.4.2 Measurement-Preserving and Observable-Preserving Slicing
 
-Tensor network slicing is a powerful technique for parallelizing computation. However, indiscriminately fixing the qubit axes targeted by measurement destroys the quantum-mechanical superposition (coherence) of the measurement results, preventing correct sampling or expectation values. To resolve this trade-off, WQC imposes constraints on slice axis selection per output mode.
+Tensor network slicing (§3.1) shrinks the register a node must hold. However, indiscriminately fixing the qubit axes targeted by measurement destroys the quantum-mechanical superposition (coherence) of the measurement results, preventing correct sampling or expectation values. To resolve this trade-off, WQC imposes constraints on slice axis selection per output mode.
 
 * **Measurement-preserving slicing**: In sampling mode, qubit axes subject to terminal measurement (`MEASURE`) are never sliced. Neither is any axis a gate acts on: fixing such an axis mid-circuit would drop its gates and the other branch of its superposition. Only idle axes are fixed. Each stays $|0\rangle$, so its single branch is the whole answer, and contraction runs on the measured state in full. A task whose remaining axes exceed Worker node memory is rejected, not approximated.
 * **Observable-preserving slicing**: In expectation mode, the same rule keeps every axis on which the requested Pauli operators ($X, Y, Z$) act non-trivially and every axis a gate acts on. A wide circuit that touches only a few qubits is dispatched on that neighborhood alone. This allows circuits declared above 28 qubits.
@@ -365,8 +371,8 @@ The following core modules have passed end-to-end (e2e) verification in the curr
 
 * **libp2p Swarm Communication**: P2P implementation of task announcement via Gossip protocol, bid stream, dispatch, and result return.
 * **Permissionless Bidding and Quorum**: Signed bidding, weighted lottery selection, node capability matching, slice-level majority vote (1e-6 amplitude grid agreement and counts exact match).
-* **Compact-register slicing**: BFS slice tree from bid-pool max-qubit capability. Each leaf is a compact-register circuit (width $N-C$ after fixing $C$ tensor legs) executed asynchronously.
-* **Leaf-to-root proof aggregation**: From leaf STARK verification to a single root-verification STARK via Aggregation STARK constructing a binary tree.
+* **Compact-register slicing**: Fixes only wires that no gate touches, each on its $|0\rangle$ branch, so every task runs as one compact-register leaf (width $N-C$ after fixing $C$ idle wires) within the bid pool's max-qubit capability. A scalar runs as one exact contraction tree or one MPS leaf. Tasks that do not fit fail. Multi-branch slicing (§3.1) is not implemented yet.
+* **Leaf-to-root proof aggregation**: From leaf STARK verification to a single root-verification STARK via Aggregation STARK constructing a binary tree. Today the tree has one leaf per task.
 * **Polymorphic output modes and Born rule proof**: Sampling (`sample_counts`) and expectation (`expectation`) modes, dynamic circuits (mid-circuit measurement), deterministic resampling via seed binding, and `DistributionAir` implementation for probability distribution validity.
 
 #### 5.2.2 Public Testnet
