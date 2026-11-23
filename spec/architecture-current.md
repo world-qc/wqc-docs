@@ -3,7 +3,7 @@
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected). Prior snapshot: `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
+- **Verified against:** `wqc-orchestrator@5ab2922` on `main` (every quote is one slice). Prior snapshots: `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
 - **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`contraction-tree.md`](contraction-tree.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
@@ -158,11 +158,11 @@ economics receipt is published.
 
 1. **Quote** — `POST /api/v1/economy/quote` estimates escrow from qubit/gate count, optional `circuit` / `output_mode`, `security_level`, and current BaseFee:
    ```
-   // sample_counts / expectation: compact-register BFS upper bound (target 26)
-   // statevector_scalar with a fitting exact tree: estimated_slices = 1,
-   //   VRAM_MiB = ceil(peak_bytes / 2^20) (contraction-tree.md)
+   // every task is one leaf: slicing fixes only idle wires
+   // sample_counts / expectation: priced at a compact width of at most 26
+   // statevector_scalar with a fitting exact tree: VRAM_MiB = ceil(peak_bytes / 2^20) (contraction-tree.md)
    // otherwise: MPS stand-in width 2048; with a circuit, one MPS leaf or a time split, else rejected
-   estimated_slices = max(1, 2^(qubits - target_width))   // no-circuit stand-in
+   estimated_slices = 1                        // 2^30 and rejected for a scalar no leaf can run
    fri_bps          = tier table                // low 5000, normal 10000, high 20000, ultra 25000
    TotalFee         = Gas × BaseFee × 10^9 × fri_bps / 10000
    per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)
