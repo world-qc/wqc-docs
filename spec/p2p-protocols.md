@@ -380,8 +380,10 @@ sets it from its own memory and speed, so that the leaf fits and finishes within
 the v2 timeout (§6.1). It is at most 2^22 (`wqc_sv_max_rows`, the protocol limit
 on `W`); a larger value selects nothing more. It is unsigned and omitted when 0.
 The reference node takes the smaller of two bounds, both from core
-`GET /sysinfo`. Core measures `sv_seconds_per_row` at startup by proving a
-small leaf (n = 12, 8 rounding steps, 1024 shots), and reports
+`GET /sysinfo`. Core measures `sv_seconds_per_row` at startup as the slope
+between two leaves (n = 12, 8 and 32 rounding steps, 1024 shots), after a
+warm-up proof, so a leaf's fixed costs do not count as per-row time; the 90 s
+base of the v2 timeout covers them. It reports
 `sv_bytes_per_row` and `sv_base_bytes`, `sv_dynamic: true` when it also proves
 mid-circuit circuits (bit 6), and `sv_state_outputs: true` when it also proves
 `statevector_scalar` and `expectation` tasks with a published state (bit 7),
