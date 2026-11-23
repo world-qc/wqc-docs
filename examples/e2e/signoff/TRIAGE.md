@@ -32,6 +32,7 @@ curl -s "$ORCH/api/v1/task/$TASK_ID" | jq .
 | Clue | Likely cause |
 | --- | --- |
 | `failed to form quorum` | too few online nodes vs `required_votes` / security_level |
+| `no node proves a v2 leaf of N qubits` (metric reason `no_wide_leaf_prover`) | the leaf has over 16 qubits and no node has the memory for it; the task is refunded and no node is slashed |
 | rising `outbox_pending` | P2P deliver retry — node↔orch connectivity |
 | rising `pending_tasks` | core slow/down — check core worker health |
 | submit `400` | client payload / billing `client_id` |
