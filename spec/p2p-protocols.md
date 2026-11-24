@@ -99,7 +99,7 @@ sender may see nothing more than a failed or unanswered stream.
 
 These are the limits of `wqc-p2p-proxy`. The largest body a node sends is the
 result of a 20-qubit scalar or expectation leaf, whose 16 MiB state is about 22 MiB
-in the JSON. The bytes past the first 256 KiB of each stream also come out of a
+in the JSON, plus the proof. The bytes past the first 256 KiB of each stream also come out of a
 shared budget (`WQC_P2P_INBOUND_BUDGET_MIB`, 128 by default) of which one peer may
 hold half; a stream waits for it rather than being dropped, within the 300 s.
 
