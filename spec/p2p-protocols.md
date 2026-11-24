@@ -341,7 +341,7 @@ Bit 2 is reserved by the orchestrator for noise channels; no node sets it yet.
   "task_id": "uuid-v7-task-identifier",
   "node_id": "12D3KooW...",
   "max_qubit_capability": 34,
-  "max_mps_qubits": 2048,
+  "max_mps_qubits": 1638,
   "sv_max_rows": 262144,
   "current_load_factors": 0,
   "timestamp": 1717776000,
@@ -369,10 +369,10 @@ big integer.
 
 `location` is egress GeoIP telemetry, not device GPS. `metrics_summary` is an unsigned
 health snapshot that the orchestrator re-exports as Prometheus gauges labeled by
-`node_id`. `max_mps_qubits` is the χ=128 MPS compact width for scalar slices (1 GiB
-holds 2048 sites). None of the three is covered by the bid signature.
+`node_id`. `max_mps_qubits` is the χ=128 MPS compact width for scalar slices: the sites
+that fit 80% of the node's memory budget (1638 at 1 GiB). None of the three is covered by the bid signature.
 `metrics_summary` must not be trusted for consensus or payment. `max_mps_qubits`
-only chooses the scalar slice width; a node that overstates it is still bounded by
+only chooses the scalar slice width and the nodes that may receive a scalar sub-task; a node that overstates it is still bounded by
 the core memory check on `N · χ² · 32` bytes.
 
 `sv_max_rows` is the largest v2 leaf, in gate rows `W`, the node proves. The node
