@@ -68,6 +68,7 @@ run_case() {
 
   if ! curl -sf -X POST "$ORCH_URL/api/v1/submit" \
     -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${WQC_SUBMIT_TOKEN:-e2e-submit-token}" \
     -d @"$path" | tee "$submit_log" | jq -e '.task_id' >/dev/null; then
     echo "FAIL [$name] submit HTTP error"
     fail=$((fail + 1))

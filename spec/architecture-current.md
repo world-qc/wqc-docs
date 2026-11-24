@@ -75,7 +75,8 @@ flowchart LR
 
 | Boundary | What crosses | Trust |
 | --- | --- | --- |
-| Client ↔ orchestrator HTTP | Submit, task status, bootstrap, quote | Public edge. Billing keys off `client_id` + Redis escrow |
+| Service ↔ orchestrator HTTP | Submit, quote | Private network. A submit needs the service token (`WQC_SUBMIT_TOKEN`); the service (dashboard, scheduled tasks) has authenticated the client whose `client_id` it sends. Billing keys off `client_id` + Redis escrow |
+| Public ↔ orchestrator HTTP | `GET` task status, bootstrap, payout binding | Public edge, read-only |
 | Node ↔ orchestrator HTTP | `GET /api/v1/p2p/bootstrap` only | Pins orchestrator PeerID and pubkey before P2P |
 | Node ↔ proxy libp2p | Announcements, bids, dispatch, results, PCS | rust-libp2p both sides. Inbound peer id must equal `node_id` |
 | Proxy ↔ orchestrator UDS | Length-prefixed JSON control frames | Same host |
@@ -129,7 +130,7 @@ sequenceDiagram
   C->>O: GET /api/v1/task/{id}
 ```
 
-1. **Submit.** `POST /api/v1/submit` on the orchestrator. Optional escrow. Returns `task_id`. Poll `GET /api/v1/task/{id}`.
+1. **Submit.** The dashboard, which has authenticated the client, sends `POST /api/v1/submit` with the service token. Optional escrow. Returns `task_id`. Poll `GET /api/v1/task/{id}`.
 2. **Announce / bid.** Signed `TaskAnnouncement` over GossipSub (with a connected-peer stream fallback). Nodes bid; the orchestrator locks a quorum-sized worker set.
 3. **Cut + dispatch.** A scalar whose exact tree fits is one full-register slice: empty assignments, parent wire numbers, `circuit_id` of that parent circuit, and `contraction_tree` on the signed sub-task ([`contraction-tree.md`](contraction-tree.md)). Every other task is a compact-register slice (`qubit_count = N-C` after fixing $C$ tensor legs, pruned circuit, `circuit_id` = SHA3-256 of that JSON). Signed `SubTask` to winners. One in-flight sub-task per node process.
 4. **Compute + prove.** Node calls core `/compute`. Core contracts the slice and proves a v2 leaf STARK in-process, then the node returns result + proof on the result stream.
@@ -227,6 +228,7 @@ Settlement log types include `escrow_lock`, `escrow_debit`, `escrow_refund`, `cl
 | `WQC_GAS_GAMMA` | `1` | per trace row |
 | `WQC_STRAGGLER_GRACE_SECS` | `30` | Wait after manifest before burn settle + escrow refund |
 | `WQC_CLIENT_BILLING` | `1` | Require client_id + escrow on submit |
+| `WQC_SUBMIT_TOKEN` | (empty) | Bearer token a submit must present. Empty refuses every submit |
 | `WQC_BASE_FEE_MIN` | `WQC_BASE_FEE` | BaseFee floor |
 | `WQC_BASE_FEE_MAX` | `0.01` | BaseFee ceiling (WQC/gas) |
 | `WQC_BASE_FEE_TARGET_QUEUE` | `10` | Target active sub-task queue depth |
