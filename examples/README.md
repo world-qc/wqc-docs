@@ -43,5 +43,6 @@ Manual submit of a circuit:
 ```bash
 curl -s -X POST "$ORCH_URL/api/v1/submit" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${WQC_SUBMIT_TOKEN:-e2e-submit-token}" \
   -d @examples/circuits/sample/sample_bell_counts.json | jq .
 ```
