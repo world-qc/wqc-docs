@@ -2,7 +2,7 @@
   "client_id": "client-01",
   "qubit_count": 1,
   "classical_bit_count": 1,
-  "security_level": "low",
+  "security_level": "normal",
   "output_mode": "sample_counts",
   "shots": 512,
   "noise_model": {
