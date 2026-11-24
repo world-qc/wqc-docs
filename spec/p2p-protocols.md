@@ -82,6 +82,27 @@ Note that the length-prefixed JSON control frames used between the orchestrator 
 `wqc-p2p-proxy` are a **different** protocol on a Unix socket. They are an internal
 detail of that pair and are not part of the swarm wire contract.
 
+### 2.2 Inbound limits
+
+Anyone can dial the orchestrator, so it reads each inbound stream on its own and
+limits what one peer can hold. A stream over a limit is dropped or reset; the
+sender may see nothing more than a failed or unanswered stream.
+
+| Limit | Value |
+|-------|-------|
+| Body of `/wqc/tensor-result/1.0.0` and `/wqc/tensor-pcs/1.0.0` | 32 MiB |
+| Body of any other inbound protocol | 64 KiB |
+| No byte received | 30 s |
+| Whole body | 300 s |
+| Open streams per peer | 32 |
+| Open streams, all peers | 512 |
+
+These are the limits of `wqc-p2p-proxy`. The largest body a node sends is the
+result of a 20-qubit scalar or expectation leaf, whose 16 MiB state is about 22 MiB
+in the JSON, plus the proof. The bytes past the first 256 KiB of each stream also come out of a
+shared budget (`WQC_P2P_INBOUND_BUDGET_MIB`, 128 by default) of which one peer may
+hold half; a stream waits for it rather than being dropped, within the 300 s.
+
 ## 3. Authentication
 
 Both directions authenticate with **Ed25519 detached signatures over a deterministic
