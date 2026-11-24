@@ -104,6 +104,7 @@ Omitted from the sample (not required for examples E2E): reverse proxy, dashboar
 | Client billing | **enabled** — every submit needs `"client_id"` |
 | Example client | `client-01` (override with `CLIENT_ID`) |
 | Client credit (E2E) | Set balance before batch runs (see §4) — default `1e20` pWQC via `CLIENT_CREDIT_PWQC` |
+| Submit token | `WQC_SUBMIT_TOKEN`, default `e2e-submit-token` in the sample compose; a submit without it is refused (401) |
 | P2P bootstrap (in-cluster) | `http://<orchestrator-host>:9000/api/v1/p2p/bootstrap` |
 
 ### Health check
@@ -152,6 +153,7 @@ chmod +x examples/e2e/signoff/*.sh
 ```http
 POST /api/v1/submit
 Content-Type: application/json
+Authorization: Bearer <WQC_SUBMIT_TOKEN>
 ```
 
 | Field | Notes |
@@ -173,6 +175,7 @@ Example (from repo root):
 export ORCH_URL="${ORCH_URL:-http://127.0.0.1:9001}"
 curl -s -X POST "$ORCH_URL/api/v1/submit" \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${WQC_SUBMIT_TOKEN:-e2e-submit-token}" \
   -d @examples/circuits/sample/sample_bell_counts.json | jq .
 ```
 

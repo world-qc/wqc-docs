@@ -61,6 +61,7 @@ submit_json() {
   local path="$1"
   curl -sf -X POST "$ORCH_URL/api/v1/submit" \
     -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${WQC_SUBMIT_TOKEN:-e2e-submit-token}" \
     -d @"$path"
 }
 

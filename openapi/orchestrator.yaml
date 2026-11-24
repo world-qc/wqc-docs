@@ -55,6 +55,10 @@ paths:
         When `WQC_CLIENT_BILLING` is enabled (default **true**), `client_id`
         is required and Redis escrow is locked from that client's balance.
 
+        Requires `Authorization: Bearer <WQC_SUBMIT_TOKEN>`. Only services that
+        authenticate their clients (the dashboard, scheduled tasks) hold the
+        token; with no token configured every submit is refused.
+
         `security_level: low` is confirmed by one vote, so it is accepted only
         when the result is bound without votes: a v2 leaf, or a circuit the
         orchestrator recomputes. Anything else is `400` before escrow; use
@@ -72,6 +76,13 @@ paths:
         `openqasm` is lowered to `circuit` before validation. Escrow uses the
         lowered gate count. Preview with `POST /api/v1/qasm/translate`.
       operationId: submitTask
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: "`Bearer <token>` of the submitting service"
       requestBody:
         required: true
         content:
@@ -138,6 +149,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/QasmErrorBody"
+        "401":
+          description: Missing or wrong service token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "402":
           description: Insufficient Redis client balance (`WQC_CLIENT_BILLING`)
           content:
