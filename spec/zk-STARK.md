@@ -174,6 +174,8 @@ $$\mathsf{PI} = \{\,\texttt{circuit\_id},\ \texttt{sub\_task\_id},\ \texttt{node
 
 Client `security_level` drives quorum (`required_votes`), bid policy, and the fee multiplier on `TotalFee` (a table per tier, `normal` = 1× and `high` = 2×; normative values in [`economics.md`](economics.md) §2). The same tier is copied onto each signed `SubTask` dispatch and threaded orch → node → `wqc-core` for leaf prove/verify, then through compose / RecAgg for the whole task tree (CGO FFI passes the level into leaf and root verifiers).
 
+`low` is confirmed by one vote, so it is offered only where the result is bound without votes: a state-vector leaf (§6.4, §6.6, or a tail, §6.7), or a circuit with no rounding step that the verifier recomputes (§2.3). A submission at `low` that is neither is refused before escrow, and a one-vote result that was neither proved nor recomputed is not accepted.
+
 | `security_level` | v1 leaf FRI `num_queries` | sv-stark (v2) leaf FRI `num_queries` |
 | --- | ---: | ---: |
 | `low` | 8 | 22 |
