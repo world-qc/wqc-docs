@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — scalar slice contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@c306dfe` on `main` (idle-wire scalar slicing). Prior snapshot: `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree` (tree handoff). MPS path prior snapshot: `wqc-orchestrator@220d17f` `wqc-core@7c721e2` `wqc-node@096dcf4` `wqc-stark-engine@12bfb3c`
+- **Verified:** 2026-11-24
+- **Verified against:** `wqc-node@ead288b` on `main` (`max_mps_qubits` from 80% of the budget) and `wqc-orchestrator@a0d2f8c` on `main` (scalar width at node selection). Prior snapshot: `wqc-orchestrator@c306dfe` on `main` (idle-wire scalar slicing). Prior snapshot: `wqc-orchestrator@206493a` `wqc-node@e81930c` `wqc-core@43c69c0` on `feature/contraction-tree` (tree handoff). MPS path prior snapshot: `wqc-orchestrator@220d17f` `wqc-core@7c721e2` `wqc-node@096dcf4` `wqc-stark-engine@12bfb3c`
 - **Audience:** Implementers of the scheduler, node and core; reviewers of quorum and proof claims
 - **Related:** [`circuit-payload.md`](circuit-payload.md) (output modes, determinism), [`contraction-tree.md`](contraction-tree.md) (scalar with an exact tree), [`p2p-protocols.md`](p2p-protocols.md) (wire layouts), [`economics.md`](economics.md) (fees and escrow), [`zk-STARK.md`](zk-STARK.md) (proof format), `wqc-core/doc/tn-engine.md` (module layout, WebGPU, env vars)
 
@@ -48,12 +48,17 @@ fix only wires no gate touches, as the scalar does (§4).
   `χ = 128` the side is 256. This bound is why the time-split budget in §5 is chosen as
   `16 × 16`.
 - **Bid field.** A node advertises `max_mps_qubits`, the compact width that fits a `χ = 128`
-  MPS in its memory budget. It travels as an unsigned JSON field next to the signed bid
+  MPS in 80% of its memory budget, the share `sv_max_rows` also uses; the rest is for the
+  process and working buffers. At 512 KiB per site, 1 GiB gives 1638 and 2.25 GiB gives 3686.
+  The 2048-qubit stand-in at quote time is not a node's width. The field travels as an unsigned JSON field next to the signed bid
   ([`p2p-protocols.md`](p2p-protocols.md)). A bid without it falls back to
   `max_qubit_capability`.
 - **`max_qubit_capability` keeps its dense meaning.** It is used to stop expectation and
   sample slicing, to pick idle capable nodes, and to recover the dense memory budget in
   `RecommendMpsMaxBondDim`. Do not read the MPS width into it.
+- **Selection.** Only nodes whose `max_mps_qubits` (or fallback) holds a scalar sub-task
+  receive it. When fewer bidders than its group needs do, the task fails before dispatch
+  and is refunded.
 - A node that overstates `max_mps_qubits` is still bounded by the core's own memory check.
 
 ## 3. Site order and cut width
