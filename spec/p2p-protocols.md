@@ -108,9 +108,10 @@ may hold half; a stream waits for it rather than being dropped, within the 300 s
 ### 2.3 Orchestrator to node
 
 A node offers the orchestrator-to-node protocols only on a connection whose peer is
-the orchestrator; to any other peer the negotiation fails. The orchestrator's streams
-to nodes are independent of each other, and one that is not opened and written within
-20 s fails.
+the orchestrator; to any other peer the negotiation fails. It queues up to 256 accepted
+streams and drops one that finds the queue full. It does not offer the bid and result
+protocols. The orchestrator's streams to nodes are independent of each other, and one
+that is not opened and written within 20 s fails.
 
 ## 3. Authentication
 
