@@ -77,7 +77,8 @@ response to EOF and parses it as JSON:
 
 Anything that is not `ok: true` must be treated as rejection. Every other protocol is
 fire-and-forget: a successful write means delivered, not accepted. A node sends a bid
-up to three times, 100 ms apart, until it is acknowledged.
+up to three times, 100 ms apart, until it is acknowledged. A node keeps a leaf PCS
+that was not acknowledged and sends it again about 30 s later.
 
 Note that the length-prefixed JSON control frames used between the orchestrator and
 `wqc-p2p-proxy` are a **different** protocol on a Unix socket. They are an internal
