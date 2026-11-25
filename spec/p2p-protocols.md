@@ -38,7 +38,7 @@ Default bootstrap port is `4001`.
 |-------------|-----------|-----|---------|
 | gossipsub topic `wqc-global-announcements` | Orchestrator → mesh | — | Broadcast `TaskAnnouncement` |
 | `/wqc/task-announce/1.0.0` | Orchestrator → Node | none | Announce fallback to directly connected peers when the mesh has not formed |
-| `/wqc/tensor-net/1.0.0` | Node → Orchestrator | none | Signed lottery bid |
+| `/wqc/tensor-net/1.0.0` | Node → Orchestrator | **yes** | Signed lottery bid |
 | `/wqc/tensor-dispatch/1.0.0` | Orchestrator → Node | none | Signed `SubTask` |
 | `/wqc/tensor-result/1.0.0` | Node → Orchestrator | none | Slice result with leaf STARK |
 | `/wqc/tensor-pcs-req/1.0.0` | Orchestrator → Node | none | Nominate a leaf PCS builder |
@@ -64,7 +64,7 @@ Do not attempt to pipeline several messages on one stream.
 
 ### 2.1 Acknowledgement
 
-Only `/wqc/tensor-pcs/1.0.0` produces a reply. After half-closing, the sender reads the
+Only `/wqc/tensor-net/1.0.0` (bids) and `/wqc/tensor-pcs/1.0.0` produce a reply. After half-closing, the sender reads the
 response to EOF and parses it as JSON:
 
 ```json
@@ -76,7 +76,9 @@ response to EOF and parses it as JSON:
 ```
 
 Anything that is not `ok: true` must be treated as rejection. Every other protocol is
-fire-and-forget: a successful write means delivered, not accepted.
+fire-and-forget: a successful write means delivered, not accepted. A node sends a bid
+up to three times, 100 ms apart, until it is acknowledged. A node keeps a leaf PCS
+that was not acknowledged and sends it again about 30 s later.
 
 Note that the length-prefixed JSON control frames used between the orchestrator and
 `wqc-p2p-proxy` are a **different** protocol on a Unix socket. They are an internal
