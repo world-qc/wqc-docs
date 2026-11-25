@@ -3,7 +3,7 @@
 - **Status:** Working spec — wire contract
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@b723542` `wqc-node@da0d2ec` `wqc-core@303ecd4` `wqc-stark-engine@2dafce2` on main (bit 9, core `sv_max_qubits`, `W_eff`, `wqc_sv_leaf_qubits`, `WQC_SV_WIDE_LEAVES`). Prior snapshot: `wqc-orchestrator@a239af8` on `feature/sv-idle-wires` (a task over 16 qubits that touches at most 16 is one v2 leaf on those wires). Prior snapshot: `wqc-orchestrator@b8571ac` `wqc-node@6cf181e` `wqc-core@403498e` `wqc-stark-engine@f4601dd` on main (bit 8, core `sv_segments`, dispatch `sv_segment`, `WQC_SV_SEGMENTS`). Prior snapshot: `wqc-orchestrator@7ade3c5` `wqc-node@bf7efba` `wqc-core@f72fce2` `wqc-stark-engine@8d7ba09` on `feature/sv-stark-scalar` (bit 7, core `sv_state_outputs`, `proof.sv_state_b64`, `WQC_SV_STATE_OUTPUTS_MAX_ROWS`). Prior snapshot: `wqc-orchestrator@81df70a` `wqc-node@ed2449e` `wqc-core@4628973` `wqc-stark-engine@96b47aa` on `feature/sv-stark-dynamic` (bit 6, core `sv_dynamic`, mid-circuit circuits rewritten by `wire::parse_leaf`); `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf); `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
+- **Verified against:** `wqc-orchestrator@73c820c` `wqc-node@f24b0f3` `wqc-p2p-proxy@0fbbe8b` on main (§2.3, no in-process orchestrator host). Prior snapshot: `wqc-orchestrator@b723542` `wqc-node@da0d2ec` `wqc-core@303ecd4` `wqc-stark-engine@2dafce2` on main (bit 9, core `sv_max_qubits`, `W_eff`, `wqc_sv_leaf_qubits`, `WQC_SV_WIDE_LEAVES`). Prior snapshot: `wqc-orchestrator@a239af8` on `feature/sv-idle-wires` (a task over 16 qubits that touches at most 16 is one v2 leaf on those wires). Prior snapshot: `wqc-orchestrator@b8571ac` `wqc-node@6cf181e` `wqc-core@403498e` `wqc-stark-engine@f4601dd` on main (bit 8, core `sv_segments`, dispatch `sv_segment`, `WQC_SV_SEGMENTS`). Prior snapshot: `wqc-orchestrator@7ade3c5` `wqc-node@bf7efba` `wqc-core@f72fce2` `wqc-stark-engine@8d7ba09` on `feature/sv-stark-scalar` (bit 7, core `sv_state_outputs`, `proof.sv_state_b64`, `WQC_SV_STATE_OUTPUTS_MAX_ROWS`). Prior snapshot: `wqc-orchestrator@81df70a` `wqc-node@ed2449e` `wqc-core@4628973` `wqc-stark-engine@96b47aa` on `feature/sv-stark-dynamic` (bit 6, core `sv_dynamic`, mid-circuit circuits rewritten by `wire::parse_leaf`); `wqc-orchestrator@a10bb07` on `feature/sv-stark-v2-partial-measure` (a partly measured `sample_counts` task is one unsliced v2 leaf); `wqc-orchestrator@23490d4` on `feature/sv-stark-v2-required` (bit 5 in `required_features` of a v2 task, no v1 fallback); `wqc-node@56dca9a` `wqc-core@5a2f2ce` on `feature/sv-stark-v2-prover` (node `sv_max_rows` from core `/sysinfo`, bit 5, refusing `sv_leaf_rows` over it, `sv_digest` kept; core proves v2 leaves) and `wqc-orchestrator@3eb0331` on `feature/sv-stark-v2-leaf` (bid `sv_max_rows`, bit 5, dispatch `sv_leaf_rows`, result `sv_digest`). Prior snapshot: `wqc-orchestrator@33d91be` `wqc-node@4be0d4d` on `feature/work-budget` (announcement `work`, `deadline_secs`, `signature_v2`, bit 4); `wqc-orchestrator@e7685ef` `wqc-node@881f684` on `feature/gate-split` (gate-half keys `control` and `target`, `supported_features` bit 3); `wqc-orchestrator@6662024` `wqc-node@e7bd9f6` on `feature/network-contraction` (network tree keys); `wqc-orchestrator@206493a` `wqc-node@e81930c` on `feature/contraction-tree` (`contraction_tree` suffix); `wqc-orchestrator@8cf0f2d` `wqc-node@2718da4` `wqc-p2p-proxy@7898c96`
 - **Audience:** Implementers of a worker node, an orchestrator, or a libp2p proxy
 - **Related:** [`spec/architecture-current.md`](architecture-current.md), [`spec/circuit-payload.md`](circuit-payload.md), [`spec/economics.md`](economics.md)
 
@@ -21,10 +21,8 @@ Three repositories implement it and must agree:
 | `wqc-node` | Verifies orchestrator signatures; signs bids and PCS bids |
 | `wqc-p2p-proxy` | rust-libp2p sidecar that terminates libp2p on the orchestrator's behalf |
 
-The orchestrator has two host backends selected at startup. Setting
-`WQC_P2P_PROXY_SOCKET` routes all P2P through `wqc-p2p-proxy` over a Unix socket;
-leaving it unset falls back to an in-process go-libp2p host bound to `0.0.0.0:4001`.
-Both speak the same wire contract, so this document does not distinguish them.
+The orchestrator has no libp2p host of its own: all P2P goes through `wqc-p2p-proxy`
+over a Unix socket (`WQC_P2P_PROXY_SOCKET`, required).
 
 Client-facing HTTP is out of scope — see `wqc-orchestrator/openapi/openapi.yaml`. The
 only node-facing HTTP call is `GET /api/v1/p2p/bootstrap`, which pins the orchestrator
@@ -106,6 +104,14 @@ about 0.5 MB of proof. A node reports a larger result as a failure, and a larger
 leaf PCS as refused. The bytes past the first 256 KiB of each stream also come out
 of a shared budget (`WQC_P2P_INBOUND_BUDGET_MIB`, 128 by default) of which one peer
 may hold half; a stream waits for it rather than being dropped, within the 300 s.
+
+### 2.3 Orchestrator to node
+
+A node offers the orchestrator-to-node protocols only on a connection whose peer is
+the orchestrator; to any other peer the negotiation fails. It queues up to 256 accepted
+streams and drops one that finds the queue full. It does not offer the bid and result
+protocols. The orchestrator's streams to nodes are independent of each other, and one
+that is not opened and written within 20 s fails.
 
 ## 3. Authentication
 
