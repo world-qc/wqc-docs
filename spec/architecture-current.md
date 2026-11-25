@@ -88,7 +88,7 @@ flowchart LR
 
 Results do not travel over HTTP. There is no node `/submit` and no result webhook.
 
-Live P2P is the rust-libp2p sidecar. Do not treat an in-process Go libp2p host as the production path.
+P2P is the rust-libp2p sidecar. The orchestrator has no libp2p host of its own.
 
 ---
 

@@ -21,10 +21,8 @@ Three repositories implement it and must agree:
 | `wqc-node` | Verifies orchestrator signatures; signs bids and PCS bids |
 | `wqc-p2p-proxy` | rust-libp2p sidecar that terminates libp2p on the orchestrator's behalf |
 
-The orchestrator has two host backends selected at startup. Setting
-`WQC_P2P_PROXY_SOCKET` routes all P2P through `wqc-p2p-proxy` over a Unix socket;
-leaving it unset falls back to an in-process go-libp2p host bound to `0.0.0.0:4001`.
-Both speak the same wire contract, so this document does not distinguish them.
+The orchestrator has no libp2p host of its own: all P2P goes through `wqc-p2p-proxy`
+over a Unix socket (`WQC_P2P_PROXY_SOCKET`, required).
 
 Client-facing HTTP is out of scope — see `wqc-orchestrator/openapi/openapi.yaml`. The
 only node-facing HTTP call is `GET /api/v1/p2p/bootstrap`, which pins the orchestrator
@@ -106,6 +104,13 @@ about 0.5 MB of proof. A node reports a larger result as a failure, and a larger
 leaf PCS as refused. The bytes past the first 256 KiB of each stream also come out
 of a shared budget (`WQC_P2P_INBOUND_BUDGET_MIB`, 128 by default) of which one peer
 may hold half; a stream waits for it rather than being dropped, within the 300 s.
+
+### 2.3 Orchestrator to node
+
+A node offers the orchestrator-to-node protocols only on a connection whose peer is
+the orchestrator; to any other peer the negotiation fails. The orchestrator's streams
+to nodes are independent of each other, and one that is not opened and written within
+20 s fails.
 
 ## 3. Authentication
 
