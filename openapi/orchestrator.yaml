@@ -364,6 +364,8 @@ paths:
           $ref: "#/components/responses/PlainBadRequest"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
 
   /api/v1/economy/burn-total:
     get:
@@ -464,6 +466,8 @@ paths:
                 type: string
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -497,6 +501,8 @@ paths:
                 type: string
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -564,6 +570,8 @@ paths:
           $ref: "#/components/responses/PlainNotFound"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -591,6 +599,8 @@ paths:
           $ref: "#/components/responses/PlainNotFound"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -601,8 +611,9 @@ paths:
       description: |
         Body may include `permit` to skip on-chain approve
         (`lockEscrowWithPermit`). Idempotent if `lock_escrow_tx_hash` is
-        already stored. Optional `X-Settle-Submit-Token` /
-        `Authorization: Bearer` when `WQC_SETTLE_SUBMIT_TOKEN` is set.
+        already stored. Needs `X-Settle-Submit-Token` /
+        `Authorization: Bearer` with `WQC_SETTLE_SUBMIT_TOKEN`; when that is
+        not set every request is refused.
       operationId: postLockEscrowSubmit
       parameters:
         - $ref: "#/components/parameters/SettleSubmitToken"
@@ -634,6 +645,8 @@ paths:
                 $ref: "#/components/schemas/LockEscrowSubmitResponse"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -675,6 +688,8 @@ paths:
                 type: string
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -720,6 +735,8 @@ paths:
                 type: string
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -751,6 +768,8 @@ paths:
           $ref: "#/components/responses/PlainNotFound"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -778,6 +797,8 @@ paths:
           $ref: "#/components/responses/PlainNotFound"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -820,6 +841,8 @@ paths:
                 $ref: "#/components/schemas/FinalizeSubmitResponse"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/PlainTooLarge"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -845,7 +868,7 @@ components:
       required: false
       schema:
         type: string
-      description: Required when `WQC_SETTLE_SUBMIT_TOKEN` is set (alternative to Bearer)
+      description: The value of `WQC_SETTLE_SUBMIT_TOKEN` (alternative to Bearer). Without a configured token every request is refused.
     AuthorizationBearer:
       name: Authorization
       in: header
@@ -863,6 +886,12 @@ components:
             type: string
     PlainBadRequest:
       description: Invalid path, query, or JSON body (text/plain)
+      content:
+        text/plain:
+          schema:
+            type: string
+    PlainTooLarge:
+      description: Body over 8 MiB (quote) or 64 KiB (the other economy endpoints) (text/plain)
       content:
         text/plain:
           schema:
