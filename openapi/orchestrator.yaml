@@ -300,7 +300,7 @@ paths:
       summary: libp2p bootstrap multiaddrs and orchestrator pubkey
       description: |
         Used by worker nodes at startup. Set `WQC_BOOTSTRAP_URLS` to this
-        full URL. When the libp2p host listens on `0.0.0.0`, set
+        full URL. When `wqc-p2p-proxy` listens on `0.0.0.0`, set
         `WQC_P2P_ADVERTISE_ADDRS` (comma-separated multiaddrs **without**
         `/p2p/…`; the handler appends the peer id).
       operationId: getP2PBootstrap
