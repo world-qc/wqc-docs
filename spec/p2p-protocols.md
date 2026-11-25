@@ -99,12 +99,13 @@ sender may see nothing more than a failed or unanswered stream.
 | Open streams per peer | 32 |
 | Open streams, all peers | 512 |
 
-These are the limits of `wqc-p2p-proxy`. The largest body a node sends is the
-result of a 20-qubit scalar or expectation leaf: about 22 MiB of JSON, the 16 MiB
-state in base64 and up to about 0.5 MB of proof. A node reports a larger result as a
-failure, and a larger leaf PCS as refused. The bytes past the first 256 KiB of each stream also come out of a
-shared budget (`WQC_P2P_INBOUND_BUDGET_MIB`, 128 by default) of which one peer may
-hold half; a stream waits for it rather than being dropped, within the 300 s.
+These are the limits of `wqc-p2p-proxy`. The largest body a node sends is the result
+of a 20-qubit scalar or expectation leaf (dispatched with wide leaves on,
+`WQC_SV_WIDE_LEAVES`): about 22 MiB of JSON, the 16 MiB state in base64 and up to
+about 0.5 MB of proof. A node reports a larger result as a failure, and a larger
+leaf PCS as refused. The bytes past the first 256 KiB of each stream also come out
+of a shared budget (`WQC_P2P_INBOUND_BUDGET_MIB`, 128 by default) of which one peer
+may hold half; a stream waits for it rather than being dropped, within the 300 s.
 
 ## 3. Authentication
 
