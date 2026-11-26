@@ -531,11 +531,13 @@ there are too few. When no bidder at all, busy or idle, has `sv_max_rows ≥ W`,
 waiting cannot help: the task fails with that reason and its escrow is refunded.
 A v2 task is never sliced: it is one sub-task over the whole register, whatever
 the bidders' `max_qubit_capability`, since `sv_max_rows` already bounds the leaf
-a node takes. The one exception is a task declared wider than a leaf may be
-(above) whose gates (an `IF`'s gate included), `MEASURE`s and observable terms
-touch few enough wires. The other wires stay `|0⟩`, so the orchestrator drops them, as slices
+a node takes. The one exception is a task with wires that no gate (an `IF`'s
+gate included), `MEASURE` or observable term touches, whatever its declared
+width; a task declared wider than a leaf may be (above) is a v2 task only when
+the wires it touches are few enough. The other wires stay `|0⟩`, so the orchestrator drops them, as slices
 fixing them at 0 would, and the counts, the `|0…0⟩` amplitude and the
-observables' values do not change. That sub-task is the leaf on the remaining
+observables' values do not change. The leaf on fewer wires is never larger, in
+gate rows or in its `2^n` states, so it is planned first. That sub-task is the leaf on the remaining
 wires, in their order: it is dispatched with no slice assignments, the pruned
 circuit and observables, `qubit_count` the wires kept (`original_qubit_count`
 stays the task's), and `circuit_id` of the pruned circuit. Nodes prove it as any
