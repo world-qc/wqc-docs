@@ -501,9 +501,9 @@ A task is a **v2 task** when all of these hold at submission:
   rows (2^20 by default, and never over the mode's own limit; `wqc_sv_tail_cut`),
   and the sub-task proves only that tail. A smaller tail fits more nodes and
   costs every verifier less; the head it lengthens is computed natively. The
-  work report of a tail counts the tail's gates, so the node is paid for the
-  leaf it proves, not for the head
-  (`sv_segment`, [`zk-STARK.md`](zk-STARK.md) §6.7). A
+  sub-task is priced, like any other, on the circuit it was dispatched with,
+  head and tail ([`economics.md`](economics.md) §2), which is what the quote
+  charged for (`sv_segment`, [`zk-STARK.md`](zk-STARK.md) §6.7). A
   circuit with mid-circuit semantics ([`circuit-payload.md`](circuit-payload.md)
   §2.1) has one when its rewritten form does ([`zk-STARK.md`](zk-STARK.md) §6.5):
   every IF holds a one-qubit gate, CNOT or CZ (not CCNOT), and the register plus
