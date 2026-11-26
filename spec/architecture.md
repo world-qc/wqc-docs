@@ -316,8 +316,9 @@ Architecture constraints that economics must satisfy:
   tasks); the mechanism must be transparent and not manipulable by the coordinator.
 - **Burn.** The automatic burn rate is a fixed protocol constant applied at settlement
   (straggler draws may reduce *effective* burn below the nominal 20%).
-- **Reward distribution.** Rewards are computed from attested work reports, which are
-  themselves bound into the proof pipeline, so payment cannot be inflated by an operator.
+- **Reward distribution.** Rewards and slashes are computed by the coordinator from the
+  dispatched work alone, never from a worker's self-reported metrics, and no payment
+  exceeds the client's escrow, so payment cannot be inflated by an operator.
 - **Dispute economics.** On the optimistic settlement path, challenging a settled root
   commitment costs a bond that is forfeit if the challenge fails. The SNARK-wrap validity
   path relies on cryptographic verification at finalize instead of that challenge window

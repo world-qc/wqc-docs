@@ -42,7 +42,7 @@ R_net       = R_compute + R_pcs               (80%, worker budget)
 | --- | --- | --- |
 | `VRAM_MiB` | Peak workspace size | Scalar with an exact tree ([`contraction-tree.md`](contraction-tree.md)): $\lceil \mathrm{peak\_bytes} / 2^{20} \rceil$. Other scalar (`statevector_scalar`, or an empty `output_mode`) with no tree: $\lceil N \chi^{2} \times 32 / 2^{20} \rceil$ with $\chi = \min(\mathrm{task}, 128)$ (task χ 0 means 128). `sample_counts` and `expectation`: $\lceil 2^{q} \times 16 / 2^{20} \rceil$ for compact width $q$ |
 | `GateCount` | Pruned gate list length | Length of the dispatched circuit |
-| `TraceRows` | STARK execution trace rows | Attested in the work report (fallback: $\max(4, \mathrm{GateCount}+1)$) |
+| `TraceRows` | STARK execution trace rows | $\max(4, \mathrm{GateCount}+1)$ of the dispatched sub-task. A worker's work report is not signed or bound by its proof: it is an observation and sets no fee, reward or slash |
 | `BaseFee` | WQC per gas, stored as sWQC | Locked per parent task at submit; may adjust globally between tasks |
 | `fri_bps` | TotalFee scale vs `normal`, per tier | `low` 5000, `normal` 10000, `high` 20000, `ultra` / empty / unknown 25000 |
 
@@ -67,10 +67,10 @@ PCS delivery may be: the nominated leaf-proof winner, an open-call spill builder
 | Quorum majority | `R_compute` | 20% reserved; settled at task finalize |
 | PCS delivery | `R_pcs` | none |
 | Straggler (correct late result) | 5% of the slice's canonical `R_compute` | paid from deferred burn |
-| Trapdoor pass | 50% of `R_compute` | none |
+| Trapdoor pass | 50% of the trap sub-task's own `R_compute`, to each node of its group | none; paid from the escrow's trap share (§3.1) |
 | Slash | confiscate as specified by governance | — |
 
-Straggler bonuses use the **canonical** slice `R_compute`, not the straggler's own heavier work report. Effective burn may be **below 20%** when stragglers are paid from the reserve; the client is still charged the 20% portion exactly once (as payout or burn).
+Every amount in this table is computed from the dispatched sub-task (§2), never from a worker's report. A trap sub-task (trapdoor audit) is a golden circuit of one gate on one qubit, with the parent's output mode, shots and observables, and its `R_compute` is computed from that. A scalar task gets at most one trap, sent to a group of `required_votes` + ⌈`required_votes`/2⌉ nodes, like any sub-task. Only scalar tasks get traps (not `sample_counts` or `expectation`). Straggler bonuses use the **canonical** slice `R_compute`. Effective burn may be **below 20%** when stragglers are paid from the reserve; the client is still charged the 20% portion exactly once (as payout or burn).
 
 ### 2.2 Accrual vs chain settlement
 
@@ -86,6 +86,7 @@ Off-chain ledgers (testnet Redis) may **accrue** rewards at quorum / PCS / strag
 2. At submit, escrow is locked and **BaseFee for that task is fixed**.
 3. Global BaseFee may move with queue depth between tasks (supply/demand signal).
 4. After work completes (and any straggler grace), burns settle and unused escrow is refunded.
+5. Every payment is taken from the task's escrow and is no more than what the escrow still holds. A payment the escrow cannot cover is not made, or is made only up to what the escrow holds; it is never funded from elsewhere.
 
 ### 3.1 Quote bound
 
@@ -93,8 +94,12 @@ Off-chain ledgers (testnet Redis) may **accrue** rewards at quorum / PCS / strag
 estimated_slices = 1                  (2^30, and rejected, for a scalar that cannot run as one leaf)
 TotalFee         = Gas_quantum × BaseFee × 10^9 × fri_bps / 10000
 per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)
-escrow           = estimated_slices × per_slice × safety_factor
+trap             = TotalFee_trap × 0.40 × 0.50 × (required_votes + ⌈required_votes/2⌉)
+                   (scalar tasks only; 0 for sample_counts and expectation)
+escrow           = (estimated_slices × per_slice + trap) × safety_factor
 ```
+
+`TotalFee_trap` is the TotalFee of the task's trap sub-task (§2.1) at the task's BaseFee and `fri_bps`. Escrow holds one trap, since a task gets at most one, and every node of the trap's group is paid if it passes. A task that gets no trap has its trap share refunded with the rest.
 
 Slicing fixes only wires no gate touches, each with its `0` branch, so every task is one leaf ([`mps-scalar.md`](mps-scalar.md) §4) and `estimated_slices` is 1. For `sample_counts` and `expectation` the leaf is priced at a compact width of at most 26 qubits (the slice scheduler's dense width, implementation default). A scalar task (`statevector_scalar`, or empty `output_mode`) is priced at a stand-in width of 2048 qubits (one χ=128 MPS in 1 GiB) when no circuit is given. With a circuit whose exact tree (state or network) fits, `estimated_slices` is 1 and `VRAM_MiB` is the tree peak ([`contraction-tree.md`](contraction-tree.md)); that quote is not saturated, including when the MPS rules would reject the circuit. Otherwise, with a circuit, `estimated_slices` follows the MPS rules of [`mps-scalar.md`](mps-scalar.md) §§4–5, and is 1 or a rejection. On the MPS path, and only on it, the node is given the parent site order: fixed qubits are removed and the survivors are packed into the compact register. It does not recompute a new order on the pruned circuit. A tree dispatch leaves `mps_site_order` empty. A cut crossed by w two-qubit gates, with m sites on its smaller side, has width `2^min(w, m)`. A one-site side stays at width 2 however many gates touch that qubit. The estimate is 1 when the wires a gate touches fit in 2048 qubits and every cut is within χ=128, for example a nearest-neighbor chain, or when the register fits and a time split keeps both halves under the overlap budget (χ≤16, or ≤8 with swap margin). Otherwise it is 2^30, and the quote or submit is rejected; fixing a touched wire would drop its gates, and fixing an idle wire does not narrow a cut. The estimate also refuses more than 100000 gates or 4096 qubits, and reports 2^30. The quote gate and qubit check applies to every output mode. Stragglers do not increase the escrow bound; they draw from deferred burn.
 
@@ -155,17 +160,19 @@ Burn       = 0.0012 WQC
 
 The same circuit at `high` (`fri_bps = 20000`) has TotalFee $= 0.012$ WQC. At `low` it is $0.003$ WQC. At `ultra` it is $0.015$ WQC.
 
+A trap sub-task (one gate on one qubit, VRAM 1 MiB) also has Gas $= 6$. At `normal` each node that passes it is paid $0.0012$ WQC, and with `required_votes = 2` the group is 3 nodes, so a scalar task's escrow holds a trap share of $0.0036$ WQC.
+
 ### ~26-qubit slice (`sample_counts` / `expectation`)
 
 Dense workspace. `security_level = normal`:
 
 ```
-VRAM_MiB ≈ 1024, GateCount ≈ 50, TraceRows ≈ 100
-Gas      ≈ 1174
-TotalFee ≈ 1.174 WQC
+VRAM_MiB = 1024, GateCount = 50, TraceRows = 51
+Gas      = 1125
+TotalFee = 1.125 WQC
 ```
 
-`high` on the same slice is $\approx 2.348$ WQC before the quorum coefficient. With `required_votes = 2` the client per-slice bound is $1.4\times$ that TotalFee for both tiers, so `high` escrow is twice `normal`.
+`high` on the same slice is $2.25$ WQC before the quorum coefficient. With `required_votes = 2` the client per-slice bound is $1.4\times$ that TotalFee for both tiers, so `high` escrow is twice `normal`.
 
 A 50-qubit scalar slice at χ = 128 has workspace $\lceil 50 \times 128^{2} \times 32 / 2^{20} \rceil = 25$ MiB. A scalar parent whose circuit is a chain, and which fits in 2048 qubits, is one slice. A 50-qubit scalar whose widest site-order cut has width above 128 is still one slice when a time split fits; it becomes two (or more) only when that cutwidth exceeds χ and no time split fits — not `2^(50-26)`. Dispatch still uses each bid's `max_mps_qubits` for the memory stop; the bond stop is that cutwidth / time-split plan ([`mps-scalar.md`](mps-scalar.md) §5).
 
