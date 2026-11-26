@@ -529,7 +529,7 @@ announcement does not carry `W`; at dispatch the orchestrator takes a quorum
 group from the bidders with `sv_max_rows ≥ W` and waits for idle ones when
 there are too few. When no bidder at all, busy or idle, has `sv_max_rows ≥ W`,
 waiting cannot help: the task fails with that reason and its escrow is refunded.
-A v2 task is never sliced: it is one sub-task over the whole register, whatever
+A v2 task is never sliced: it is one sub-task over its register (less any idle wires, below), whatever
 the bidders' `max_qubit_capability`, since `sv_max_rows` already bounds the leaf
 a node takes. The one exception is a task with wires that no gate (an `IF`'s
 gate included), `MEASURE` or observable term touches, whatever its declared
