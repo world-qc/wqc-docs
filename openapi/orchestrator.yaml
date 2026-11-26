@@ -345,7 +345,9 @@ paths:
         (MPS quote width stand-in 2048). Every task is quoted as one slice:
         slicing fixes only wires no gate touches. When `circuit` is present,
         a scalar that no exact tree, MPS leaf or time split can run returns
-        400.
+        400. A scalar task's escrow also holds its one trapdoor audit: half
+        the trap sub-task's compute reward for each node it is sent to
+        (`required_votes` plus half as many again, rounded up).
       operationId: postEconomyQuote
       requestBody:
         required: true
@@ -1362,6 +1364,10 @@ components:
           type: string
         escrow_pwqc:
           type: string
+          description: |
+            `per_slice_pwqc` × `estimated_slices`, plus a scalar task's one
+            trap. Rewards are paid from it and never exceed it; the rest is
+            refunded.
         escrow_wqc:
           type: string
         estimated_slices:

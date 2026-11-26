@@ -5,7 +5,7 @@
       "name": "orchestrator",
       "repo": "world-qc/wqc-orchestrator",
       "path": "openapi/openapi.yaml",
-      "sha": "73c820cd396b98647fc84a0eaf23e488d63ee39f",
+      "sha": "a76a673462a33b3e50cf71ec2eef6048c129b8d7",
       "file": "orchestrator.yaml"
     },
     {
@@ -16,5 +16,5 @@
       "file": "core.yaml"
     }
   ],
-  "synced_at": "2026-11-25T21:59:03Z"
+  "synced_at": "2026-11-26T16:08:55Z"
 }
