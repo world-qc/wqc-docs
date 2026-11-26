@@ -629,9 +629,10 @@ store the state; the stored proof binds its digest. At n = 16 the state is 1 MiB
 about 1.8 MiB in the proxy's frame, within its 64 MiB limit. The quorum then
 compares the values as for v1; every honest node reports the same ones.
 
-`work_report` feeds gas settlement. Only `trace_rows` and `gate_count` are deterministic
-and therefore settlement-relevant; the wall-clock fields are audit-only. Nodes also send
-`tn_backend` and `vram_peak_bytes`, which the orchestrator currently ignores.
+`work_report` is an observation. It is not signed or bound by the proof, so no fee,
+reward or slash is computed from it ([`economics.md`](economics.md) §2): the orchestrator
+prices the sub-task it dispatched. Nodes also send `tn_backend` and `vram_peak_bytes`,
+which the orchestrator ignores as well.
 
 On compute failure the node sends **only** `sub_task_id`, `node_id`, and `error`:
 

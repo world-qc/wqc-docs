@@ -242,9 +242,9 @@ The core reports which in `work_report.proof_scope`:
 | `mps_time_split_halves` | Both sweeps are in the trace |
 | `mps_time_split_first_half` | Only the ket sweep is traced |
 
-This field is a hint from the node. **The orchestrator overwrites it** with
-`proof_scope = mps_time_split` whenever it dispatched `MpsTimeSplit ≠ 0`, and never trusts
-the node's value.
+This field is a hint from the node, part of its `work_report`, which the orchestrator does
+not use for anything ([`economics.md`](economics.md) §2). Whether a task was split is what
+the orchestrator dispatched (`MpsTimeSplit ≠ 0`), never the node's value.
 
 As for any scalar, the trace's STARK shadows 2 amplitudes. It does not bind the whole MPS.
 
