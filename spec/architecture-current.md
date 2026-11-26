@@ -169,11 +169,13 @@ economics receipt is published.
    per_slice        = TotalFee × (0.40×required_votes + 0.40 + 0.20)
                       //          compute per node    R_pcs  burn
                       // stragglers draw from deferred burn, not extra escrow
-   escrow           = estimated_slices × per_slice × safety_bps/10000
+   trap             = TotalFee_trap × 0.20 × (required_votes + ⌈required_votes/2⌉)
+                      // scalar only: one trap (1 gate on 1 qubit), each node of its group
+   escrow           = (estimated_slices × per_slice + trap) × safety_bps/10000
    ```
    At `required_votes = 2` the per-slice coefficient is `1.4 × TotalFee`. `normal` and `high` share that vote count; `high` TotalFee is 2× `normal`, so escrow is 2×. Settlement debits use the same `fri_bps`. Default `WQC_ESCROW_SAFETY_BPS=10000` (no margin).
 2. **Submit** — client sends `client_id` (required when `WQC_CLIENT_BILLING=1`); orchestrator locks escrow from `economy:client:{id}:balance`. BaseFee is **locked per task**.
-3. **Accrue** — quorum / PCS / straggler debit client escrow and credit operator balances.
+3. **Accrue** — quorum / PCS / straggler / trap debit client escrow and credit operator balances. Each credit is what the debit took: never more than the escrow holds. Amounts come from the dispatched sub-task, not from the node's `work_report`.
 4. **Finalize** — after `WQC_STRAGGLER_GRACE_SECS`, settle pending burns, refund unused escrow, upload economics receipt.
 
 Global BaseFee adjusts on each submit from queue depth (`subtasks:active`):
