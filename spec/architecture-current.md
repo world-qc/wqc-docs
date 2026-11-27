@@ -3,7 +3,7 @@
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@be7da58` on `main` (a result accepted and a leaf PCS paid once). Prior snapshots: `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow); `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
+- **Verified against:** `wqc-orchestrator@2ea3784` on `main` (an escrow sweeper settles what finalize could not). Prior snapshots: `wqc-orchestrator@be7da58` on `main` (a result accepted and a leaf PCS paid once); `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow); `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
 - **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`contraction-tree.md`](contraction-tree.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
@@ -177,6 +177,14 @@ economics receipt is published.
 2. **Submit** — client sends `client_id` (required when `WQC_CLIENT_BILLING=1`); orchestrator locks escrow from `economy:client:{id}:balance`. BaseFee is **locked per task**.
 3. **Accrue** — quorum / PCS / straggler / trap debit client escrow and credit operator balances. Each credit is what the debit took: never more than the escrow holds. Amounts come from the dispatched sub-task, not from the node's `work_report`.
 4. **Finalize** — after `WQC_STRAGGLER_GRACE_SECS`, settle pending burns, refund unused escrow, upload economics receipt.
+5. **Sweep** — every minute, an escrow sweeper settles what step 4 could not: a restart during the grace, a failed refund, or a finalize that stopped. It goes through the locked-escrow index (`economy:escrow:locked`) and acts only on escrows locked over 10 minutes ago:
+   - **Task meta gone, task not in flight:** settle its burns and refund it. No receipt is written. A failed refund is retried on the next sweep.
+   - **Task `completed` or `failed`, with no meta write for the grace + 2 minutes:** run step 4.
+   - **Task `finalizing` with no meta write for an hour, and no finalize holding its claim:** retry once. If it is still stuck an hour later, fail the task and refund it.
+
+   A finalize that stops before the task is completed gives its claim back. So a held claim means a finalize is still running, and the sweeper never removes one. The same sweep releases, without forfeit, stake reservations whose task finished more than the grace ago, or is gone.
+
+   Step 4 writes the receipt only with the refund it made itself. If the refund fails, or was made earlier, it writes none; a failed refund leaves the escrow locked for the sweeper.
 
 Global BaseFee adjusts on each submit from queue depth (`subtasks:active`):
 
@@ -207,6 +215,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:client:{client_id}:balance` | Client pWQC balance |
 | `economy:task:{task_id}:escrow` | Locked pWQC remaining |
 | `economy:task:{task_id}:escrow_meta` | JSON: client_id, base_fee_swqc, status |
+| `economy:escrow:locked` | ZSET of locked escrows (`task_id`, score = lock time). Lock adds and refund removes it, in the same transaction; the sweeper reads it (§4.1 step 5) |
 | `economy:task:{parent_task_id}:slice_economics` | HASH sub_task_id → per-slice economics JSON |
 | `economy:task:{parent_task_id}:burn_pending_subtasks` | SET of sub-task IDs with pending burn |
 | `economy:task:{parent_task_id}:composer_pcs:{sub_task_id}` | SETNX marker that pays a sub-task's `R_pcs` once: to the node or open-call builder that delivered its leaf PCS, or to the composer's fallback (the name predates the node's use) |
