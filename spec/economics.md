@@ -68,9 +68,9 @@ PCS delivery may be: the nominated leaf-proof winner, an open-call spill builder
 | PCS delivery | `R_pcs` | none |
 | Straggler (correct late result) | 5% of the slice's canonical `R_compute` | paid from deferred burn |
 | Trapdoor pass | 50% of the trap sub-task's own `R_compute`, to each node of its group | none; paid from the escrow's trap share (§3.1) |
-| Slash | confiscate as specified by governance | — |
+| Slash | the slashed operator's balance loses up to the sub-task's `TotalFee`, and its stake reserved for the assignment is forfeited | everything confiscated is burned |
 
-Every amount in this table is computed from the dispatched sub-task (§2), never from a worker's report. A trap sub-task (trapdoor audit) is a golden circuit of one gate on one qubit, with the parent's output mode, shots and observables, and its `R_compute` is computed from that. A scalar task gets at most one trap, sent to a group of `required_votes` + ⌈`required_votes`/2⌉ nodes, like any sub-task. Only scalar tasks get traps (not `sample_counts` or `expectation`). Straggler bonuses use the **canonical** slice `R_compute`. Effective burn may be **below 20%** when stragglers are paid from the reserve; the client is still charged the 20% portion exactly once (as payout or burn).
+Every amount in this table is computed from the dispatched sub-task (§2), never from a worker's report. A reward or slash on a sub-task goes to the operator whose stake was reserved when it was dispatched, whatever operator the worker's later bids name (§4). A trap sub-task (trapdoor audit) is a golden circuit of one gate on one qubit, with the parent's output mode, shots and observables, and its `R_compute` is computed from that. A scalar task gets at most one trap, sent to a group of `required_votes` + ⌈`required_votes`/2⌉ nodes, like any sub-task. Only scalar tasks get traps (not `sample_counts` or `expectation`). Straggler bonuses use the **canonical** slice `R_compute`. Effective burn may be **below 20%** when stragglers are paid from the reserve; the client is still charged the 20% portion exactly once (as payout or burn).
 
 ### 2.2 Accrual vs chain settlement
 
@@ -113,6 +113,8 @@ Slicing fixes only wires no gate touches, each with its `0` branch, so every tas
 | **operator** | Economic subject (Ed25519 key; testnet often derived from a Node Key `nk_…`) |
 | **operator_id** | `sha256(operator Ed25519 pubkey)` — off-chain ledger key on testnet |
 | **payout address** | EVM `0x` address that receives on-chain rewards |
+
+A worker's peer is bound to the operator of its last bid that passed both the operator signature and the stake check; a refused bid does not move it. Each assignment records the operator whose stake it reserved, and the assignment's release, forfeit, reward and slash use that operator.
 
 Testnet may keep balances under `operator_id` without a chain address. Mainnet payouts require a registered **payout address**.
 
