@@ -3,7 +3,7 @@
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow). Prior snapshots: `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
+- **Verified against:** `wqc-orchestrator@be7da58` on `main` (a result accepted and a leaf PCS paid once). Prior snapshots: `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow); `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
 - **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`contraction-tree.md`](contraction-tree.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
@@ -209,7 +209,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:task:{task_id}:escrow_meta` | JSON: client_id, base_fee_swqc, status |
 | `economy:task:{parent_task_id}:slice_economics` | HASH sub_task_id → per-slice economics JSON |
 | `economy:task:{parent_task_id}:burn_pending_subtasks` | SET of sub-task IDs with pending burn |
-| `economy:task:{parent_task_id}:composer_pcs:{sub_task_id}` | SETNX marker for composer fallback `R_pcs` |
+| `economy:task:{parent_task_id}:composer_pcs:{sub_task_id}` | SETNX marker that pays a sub-task's `R_pcs` once: to the node or open-call builder that delivered its leaf PCS, or to the composer's fallback (the name predates the node's use) |
 | `economy:subtask:{sub_task_id}:burn_recorded` | SETNX marker; burn counted once per sub-task |
 | `economy:subtask:{sub_task_id}:burn_pending` | Deferred burn budget remaining (pWQC string) |
 | `economy:base_fee` | Current dynamic BaseFee (sWQC/gas) |
