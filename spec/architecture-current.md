@@ -209,7 +209,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:task:{task_id}:escrow_meta` | JSON: client_id, base_fee_swqc, status |
 | `economy:task:{parent_task_id}:slice_economics` | HASH sub_task_id → per-slice economics JSON |
 | `economy:task:{parent_task_id}:burn_pending_subtasks` | SET of sub-task IDs with pending burn |
-| `economy:task:{parent_task_id}:composer_pcs:{sub_task_id}` | SETNX marker for composer fallback `R_pcs` |
+| `economy:task:{parent_task_id}:composer_pcs:{sub_task_id}` | SETNX marker that pays a sub-task's `R_pcs` once: to the node or open-call builder that delivered its leaf PCS, or to the composer's fallback (the name predates the node's use) |
 | `economy:subtask:{sub_task_id}:burn_recorded` | SETNX marker; burn counted once per sub-task |
 | `economy:subtask:{sub_task_id}:burn_pending` | Deferred burn budget remaining (pWQC string) |
 | `economy:base_fee` | Current dynamic BaseFee (sWQC/gas) |
