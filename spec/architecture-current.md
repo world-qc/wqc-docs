@@ -3,7 +3,7 @@
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
 - **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@2ea3784` on `main` (an escrow sweeper settles what finalize could not). Prior snapshots: `wqc-orchestrator@be7da58` on `main` (a result accepted and a leaf PCS paid once); `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow); `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
+- **Verified against:** `wqc-orchestrator@a30e754` on `main` (stake, slash and reward bound to the dispatch's operator; confiscations burned). Prior snapshots: `wqc-orchestrator@2ea3784` on `main` (an escrow sweeper settles what finalize could not); `wqc-orchestrator@be7da58` on `main` (a result accepted and a leaf PCS paid once); `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow); `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
 - **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`contraction-tree.md`](contraction-tree.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
@@ -175,7 +175,7 @@ economics receipt is published.
    ```
    At `required_votes = 2` the per-slice coefficient is `1.4 × TotalFee`. `normal` and `high` share that vote count; `high` TotalFee is 2× `normal`, so escrow is 2×. Settlement debits use the same `fri_bps`. Default `WQC_ESCROW_SAFETY_BPS=10000` (no margin).
 2. **Submit** — client sends `client_id` (required when `WQC_CLIENT_BILLING=1`); orchestrator locks escrow from `economy:client:{id}:balance`. BaseFee is **locked per task**.
-3. **Accrue** — quorum / PCS / straggler / trap debit client escrow and credit operator balances. Each credit is what the debit took: never more than the escrow holds. Amounts come from the dispatched sub-task, not from the node's `work_report`.
+3. **Accrue** — quorum / PCS / straggler / trap debit client escrow and credit operator balances. Each credit is what the debit took: never more than the escrow holds. Amounts come from the dispatched sub-task, not from the node's `work_report`. The credited operator is the one recorded on the assignment's stake reservation; a PCS reward paid after release goes to the peer's bound operator. A slash takes up to the sub-task's `TotalFee` from that operator's balance and forfeits the reservation from its stake. Both amounts are burned (`economy:burn_total`, settlement log `burn` with reason `slash` / `stake_forfeit`), in one transaction with the slash itself.
 4. **Finalize** — after `WQC_STRAGGLER_GRACE_SECS`, settle pending burns, refund unused escrow, upload economics receipt.
 5. **Sweep** — every minute, an escrow sweeper settles what step 4 could not: a restart during the grace, a failed refund, or a finalize that stopped. It goes through the locked-escrow index (`economy:escrow:locked`) and acts only on escrows locked over 10 minutes ago:
    - **Task meta gone, task not in flight:** settle its burns and refund it. No receipt is written. A failed refund is retried on the next sweep.
@@ -209,9 +209,9 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:operator:{operator_id}:balance` | Wallet pWQC (faucet and rewards; not job collateral) |
 | `economy:operator:{operator_id}:staked` | Operator-chosen stake pWQC |
 | `economy:operator:{operator_id}:stake_locked` | In-flight reservation total, a subset of `staked` |
-| `economy:stake_lock:{sub_task_id}:{node_id}` | One assignment reservation. Repeat lock / release / forfeit is a no-op |
+| `economy:stake_lock:{sub_task_id}:{node_id}` | One assignment reservation, JSON `{operator_id, amount_pwqc}`: the operator whose stake was reserved at dispatch. Release, forfeit, reward and slash on the sub-task use it. Repeat lock / release / forfeit is a no-op |
 | `economy:operator:{operator_id}:pubkey` | Operator Ed25519 public key (base64) |
-| `economy:peer_operator:{peer_id}` | Maps libp2p peer → operator_id |
+| `economy:peer_operator:{peer_id}` | Maps libp2p peer → operator_id. Written only for a bid that passed its signature and stake checks |
 | `economy:client:{client_id}:balance` | Client pWQC balance |
 | `economy:task:{task_id}:escrow` | Locked pWQC remaining |
 | `economy:task:{task_id}:escrow_meta` | JSON: client_id, base_fee_swqc, status |
@@ -222,7 +222,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:subtask:{sub_task_id}:burn_recorded` | SETNX marker; burn counted once per sub-task |
 | `economy:subtask:{sub_task_id}:burn_pending` | Deferred burn budget remaining (pWQC string) |
 | `economy:base_fee` | Current dynamic BaseFee (sWQC/gas) |
-| `economy:burn_total` | Cumulative burn pWQC |
+| `economy:burn_total` | Cumulative burn pWQC, including what slashes and forfeits confiscate |
 | `economy:foundation:balance` | Foundation reserve scaffold (metrics; **not** used for straggler payouts) |
 | `economy:settlement:log` | RPUSH JSON audit entries |
 
