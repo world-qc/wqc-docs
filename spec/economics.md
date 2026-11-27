@@ -52,6 +52,8 @@ VRAM is measured in **MiB**, not KiB, so default coefficients keep per-slice rew
 
 Default coefficient intent: $\alpha = \beta = \gamma = 1$. Implementations may expose overrides; changing defaults is a Tier A substantive change.
 
+**Implementation status (v2 leaves).** A v2 (sv-stark) leaf is budgeted as $W_{\mathrm{eff}} = W + 3 \cdot \max(0,\ 2^{n} - 2^{16})$ rows ([`zk-STARK.md`](zk-STARK.md) §6.4), about $3 \cdot 2^{n}$ for a wide leaf and far more than `TraceRows`. Today its proving cost is carried only by the `VRAM_MiB` term, which also grows as $2^{n}$ but with a small weight. The weight is to be set from proving times measured on testnet before mainnet.
+
 ### 2.1 Roles paid from `TotalFee`
 
 | Role | Count | Earns |

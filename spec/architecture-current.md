@@ -175,7 +175,7 @@ economics receipt is published.
    ```
    At `required_votes = 2` the per-slice coefficient is `1.4 × TotalFee`. `normal` and `high` share that vote count; `high` TotalFee is 2× `normal`, so escrow is 2×. Settlement debits use the same `fri_bps`. Default `WQC_ESCROW_SAFETY_BPS=10000` (no margin).
 2. **Submit** — client sends `client_id` (required when `WQC_CLIENT_BILLING=1`); orchestrator locks escrow from `economy:client:{id}:balance`. BaseFee is **locked per task**.
-3. **Accrue** — quorum / PCS / straggler / trap debit client escrow and credit operator balances. Each credit is what the debit took: never more than the escrow holds. Amounts come from the dispatched sub-task, not from the node's `work_report`. The credited operator is the one recorded on the assignment's stake reservation; a PCS reward paid after release goes to the peer's bound operator. A slash takes up to the sub-task's `TotalFee` from that operator's balance and forfeits the reservation from its stake. Both amounts are burned (`economy:burn_total`, settlement log `burn` with reason `slash` / `stake_forfeit`), in one transaction with the slash itself.
+3. **Accrue** — quorum / PCS / straggler / trap debit client escrow and credit operator balances. Each credit is what the debit took: never more than the escrow holds. Amounts come from the dispatched sub-task, not from the node's `work_report`. A scalar task quoted on an exact tree's peak keeps that peak on its escrow (`quote_peak_bytes`), and a sub-task dispatched without the tree is priced on it, so settlement uses the quote's VRAM; a trap is priced on its own circuit. The credited operator is the one recorded on the assignment's stake reservation; a PCS reward paid after release goes to the peer's bound operator. A slash takes up to the sub-task's `TotalFee` from that operator's balance and forfeits the reservation from its stake. Both amounts are burned (`economy:burn_total`, settlement log `burn` with reason `slash` / `stake_forfeit`), in one transaction with the slash itself.
 4. **Finalize** — after `WQC_STRAGGLER_GRACE_SECS`, settle pending burns, refund unused escrow, upload economics receipt.
 5. **Sweep** — every minute, an escrow sweeper settles what step 4 could not: a restart during the grace, a failed refund, or a finalize that stopped. It goes through the locked-escrow index (`economy:escrow:locked`) and acts only on escrows locked over 10 minutes ago:
    - **Task meta gone, task not in flight:** settle its burns and refund it. No receipt is written. A failed refund is retried on the next sweep.
@@ -214,7 +214,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:peer_operator:{peer_id}` | Maps libp2p peer → operator_id. Written only for a bid that passed its signature and stake checks |
 | `economy:client:{client_id}:balance` | Client pWQC balance |
 | `economy:task:{task_id}:escrow` | Locked pWQC remaining |
-| `economy:task:{task_id}:escrow_meta` | JSON: client_id, base_fee_swqc, status |
+| `economy:task:{task_id}:escrow_meta` | JSON: client_id, base_fee_swqc, status, quote_peak_bytes (the contraction-tree peak the quote priced VRAM on) |
 | `economy:escrow:locked` | ZSET of locked escrows (`task_id`, score = lock time). Lock adds and refund removes it, in the same transaction; the sweeper reads it (§4.1 step 5) |
 | `economy:task:{parent_task_id}:slice_economics` | HASH sub_task_id → per-slice economics JSON |
 | `economy:task:{parent_task_id}:burn_pending_subtasks` | SET of sub-task IDs with pending burn |
