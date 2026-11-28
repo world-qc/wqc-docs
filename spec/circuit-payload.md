@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — payload contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-08-29
-- **Verified against:** `wqc-orchestrator@c075f0c` `wqc-core@447c795` on `feature/request-size` (§5 body limits). Prior snapshot: `wqc-orchestrator@9f539f6` `wqc-core@f162911` `wqc-node@2718da4`
+- **Verified:** 2026-11-28
+- **Verified against:** `wqc-core@4e650eb` on `main` (§1 `RESET` discards the qubit's value). Prior snapshots: `wqc-orchestrator@c075f0c` `wqc-core@447c795` on `feature/request-size` (§5 body limits); `wqc-orchestrator@9f539f6` `wqc-core@f162911` `wqc-node@2718da4`
 - **Audience:** Client developers, and implementers of the submit / dispatch / compute path
 - **Related:** `wqc-orchestrator/openapi/openapi.yaml`, `wqc-core/openapi/openapi.yaml`, `wqc-core/doc/trace-spec.md`, [`spec/zk-STARK.md`](zk-STARK.md), [`spec/OpenQASM.md`](OpenQASM.md)
 
@@ -34,7 +34,7 @@ selects the operation and `params` carries its operands.
 | `type` | `params` shape | Meaning |
 |--------|----------------|---------|
 | `H` `X` `Y` `Z` `S` `T` | qubit index | Single-qubit unitary |
-| `RESET` | qubit index | Project the qubit to \|0⟩ |
+| `RESET` | qubit index | Reset the qubit to \|0⟩: its value is discarded, as if it were measured without recording the outcome and flipped to \|0⟩ on 1 |
 | `CNOT` `CZ` | `[control, target]` | Two-qubit unitary |
 | `CCNOT` | `[control_1, control_2, target]` | Toffoli |
 | `RX` `RY` `RZ` | `[qubit, theta_radians]` | Rotation; `theta` is a float |
