@@ -127,8 +127,9 @@ apply otherwise.
 In every mode the unitary execution trace is what the leaf STARK proves. The output mode
 only changes which result digest is bound into the public inputs.
 
-`statevector_scalar` rejects circuits containing `MEASURE`. `expectation` requires
-`observables` and rejects `MEASURE`. `sample_counts` requires at least one `MEASURE`,
+`statevector_scalar` and `expectation` take unitary circuits only: they reject `MEASURE`,
+`RESET` and `IF`. `expectation` also requires `observables`. `sample_counts` requires at
+least one `MEASURE`,
 plus `classical_bit_count` and `shots`.
 
 The scalar amplitude is present in **all** responses, including `sample_counts` and
@@ -210,7 +211,7 @@ coefficients only. Results are on the `1e-6` grid of [§4](#4-determinism-and-qu
 
 Observable `id` must be unique within a request, and results are keyed by it. An
 observable with no terms, an unknown Pauli character, or a length mismatch is rejected.
-`expectation` also forbids `MEASURE` gates entirely.
+`expectation` also forbids `MEASURE`, `RESET` and `IF` gates entirely.
 
 ## 8. OpenQASM linear subset
 
