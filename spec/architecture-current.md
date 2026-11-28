@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — live component map
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-11-22
-- **Verified against:** `wqc-orchestrator@1c9a022` on `main` (atomic burn reservation, saturating gas, trap rewards on the receipt). Prior snapshots: `wqc-orchestrator@6f8c488` on `main` (settlement prices a leaf on its escrow's quoted peak); `wqc-orchestrator@a30e754` on `main` (stake, slash and reward bound to the dispatch's operator; confiscations burned); `wqc-orchestrator@2ea3784` on `main` (an escrow sweeper settles what finalize could not); `wqc-orchestrator@be7da58` on `main` (a result accepted and a leaf PCS paid once); `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow); `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
+- **Verified:** 2026-11-28
+- **Verified against:** `wqc-orchestrator@ee6f27f` on `main` (completed tasks' slice proofs deleted; settlement log capped at 20,000). Prior snapshots: `wqc-orchestrator@1c9a022` on `main` (atomic burn reservation, saturating gas, trap rewards on the receipt); `wqc-orchestrator@6f8c488` on `main` (settlement prices a leaf on its escrow's quoted peak); `wqc-orchestrator@a30e754` on `main` (stake, slash and reward bound to the dispatch's operator; confiscations burned); `wqc-orchestrator@2ea3784` on `main` (an escrow sweeper settles what finalize could not); `wqc-orchestrator@be7da58` on `main` (a result accepted and a leaf PCS paid once); `wqc-orchestrator@a76a673` on `main` (payment from the dispatched sub-task, within the escrow; one trap held in escrow); `wqc-orchestrator@73c820c` `wqc-p2p-proxy@0fbbe8b` on `main` (all orchestrator P2P goes through the proxy); `wqc-orchestrator@5ab2922` on `main` (every quote is one slice); `wqc-orchestrator@c306dfe` on `main` (scalar quote is one leaf or rejected); `wqc-orchestrator@206493a` on `feature/contraction-tree` (exact-tree dispatch and quote). Component map prior snapshot: 2026-08-19, `wqc-orchestrator` `wqc-core` `wqc-node` `wqc-p2p-proxy` `wqc-composer` `wqc-stark-engine` `wqc-snark-wrap` `wqc-contracts`
 - **Audience:** Implementers and operators who need the current component map
 - **Related:** [`architecture.md`](architecture.md) — the target-state spec (sovereign network), [`economics.md`](economics.md), [`contraction-tree.md`](contraction-tree.md), [`zk-STARK.md`](zk-STARK.md), [`zk-SNARK.md`](zk-SNARK.md), [`../examples/E2E.md`](../examples/E2E.md), [`../whitepaper/WHITEPAPER_0.5_en.md`](../whitepaper/WHITEPAPER_0.5_en.md)
 
@@ -225,7 +225,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:base_fee` | Current dynamic BaseFee (sWQC/gas) |
 | `economy:burn_total` | Cumulative burn pWQC, including what slashes and forfeits confiscate |
 | `economy:foundation:balance` | Foundation reserve scaffold (metrics; **not** used for straggler payouts) |
-| `economy:settlement:log` | RPUSH JSON audit entries |
+| `economy:settlement:log` | RPUSH JSON audit entries; the orchestrator keeps the newest 20,000 (LTRIM). Older task settlements are in the economics receipts; older stake, unstake, faucet and key-rotation entries are not kept |
 
 Logs use `[LEDGER REWARD]`, `[LEDGER BURN]`, etc. Balances survive orchestrator restarts.
 Settlement log types include `escrow_lock`, `escrow_debit`, `escrow_refund`, `client_credit`, `stake`, and `unstake`.
@@ -297,7 +297,7 @@ Normative economics: [`economics.md`](economics.md).
 | Task has `manifest_url` but no `receipt_url` after grace | Receipt publish or meta write issue (or still in grace) |
 | Redis `economy:task:{id}:burn_pending_subtasks` non-empty long after complete | Burn settle did not clear |
 
-Do not `FLUSHALL` the ledger. Prefer `economy:settlement:log` and receipt objects for audit.
+Do not `FLUSHALL` the ledger. For a task's settlement, use its receipt object. `economy:settlement:log` holds only the newest 20,000 entries; it is the only record of stake, unstake, faucet and key-rotation entries.
 
 ---
 
