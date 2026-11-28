@@ -225,7 +225,7 @@ Rewards credit `operator_id`, not `nk_` and not libp2p `peer_id`. See [`economic
 | `economy:base_fee` | Current dynamic BaseFee (sWQC/gas) |
 | `economy:burn_total` | Cumulative burn pWQC, including what slashes and forfeits confiscate |
 | `economy:foundation:balance` | Foundation reserve scaffold (metrics; **not** used for straggler payouts) |
-| `economy:settlement:log` | RPUSH JSON audit entries; the orchestrator keeps the newest 20,000 (LTRIM). Older entries are in the economics receipts |
+| `economy:settlement:log` | RPUSH JSON audit entries; the orchestrator keeps the newest 20,000 (LTRIM). Older task settlements are in the economics receipts; older stake, unstake, faucet and key-rotation entries are not kept |
 
 Logs use `[LEDGER REWARD]`, `[LEDGER BURN]`, etc. Balances survive orchestrator restarts.
 Settlement log types include `escrow_lock`, `escrow_debit`, `escrow_refund`, `client_credit`, `stake`, and `unstake`.
@@ -297,7 +297,7 @@ Normative economics: [`economics.md`](economics.md).
 | Task has `manifest_url` but no `receipt_url` after grace | Receipt publish or meta write issue (or still in grace) |
 | Redis `economy:task:{id}:burn_pending_subtasks` non-empty long after complete | Burn settle did not clear |
 
-Do not `FLUSHALL` the ledger. For audit, use the receipt objects; `economy:settlement:log` holds only the newest 20,000 entries.
+Do not `FLUSHALL` the ledger. For a task's settlement, use its receipt object. `economy:settlement:log` holds only the newest 20,000 entries; it is the only record of stake, unstake, faucet and key-rotation entries.
 
 ---
 
