@@ -2,8 +2,8 @@
 
 - **Status:** Working spec — payload contract
 - **Tier:** B (implementation snapshot)
-- **Verified:** 2026-08-29
-- **Verified against:** `wqc-orchestrator@c075f0c` `wqc-core@447c795` on `feature/request-size` (§5 body limits). Prior snapshot: `wqc-orchestrator@9f539f6` `wqc-core@f162911` `wqc-node@2718da4`
+- **Verified:** 2026-11-28
+- **Verified against:** `wqc-core@4e650eb` on `main` (§1 `RESET` discards the qubit's value). Prior snapshots: `wqc-orchestrator@c075f0c` `wqc-core@447c795` on `feature/request-size` (§5 body limits); `wqc-orchestrator@9f539f6` `wqc-core@f162911` `wqc-node@2718da4`
 - **Audience:** Client developers, and implementers of the submit / dispatch / compute path
 - **Related:** `wqc-orchestrator/openapi/openapi.yaml`, `wqc-core/openapi/openapi.yaml`, `wqc-core/doc/trace-spec.md`, [`spec/zk-STARK.md`](zk-STARK.md), [`spec/OpenQASM.md`](OpenQASM.md)
 
