@@ -34,7 +34,7 @@ selects the operation and `params` carries its operands.
 | `type` | `params` shape | Meaning |
 |--------|----------------|---------|
 | `H` `X` `Y` `Z` `S` `T` | qubit index | Single-qubit unitary |
-| `RESET` | qubit index | Project the qubit to \|0⟩ |
+| `RESET` | qubit index | Reset the qubit to \|0⟩: its value is discarded, as if it were measured without recording the outcome and flipped to \|0⟩ on 1 |
 | `CNOT` `CZ` | `[control, target]` | Two-qubit unitary |
 | `CCNOT` | `[control_1, control_2, target]` | Toffoli |
 | `RX` `RY` `RZ` | `[qubit, theta_radians]` | Rotation; `theta` is a float |
